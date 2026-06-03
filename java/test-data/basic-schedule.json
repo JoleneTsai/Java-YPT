@@ -1,0 +1,62 @@
+{
+  "calendarEvents": [
+    {
+      "title": "小組討論",
+      "startTime": "2026-05-20T14:00",
+      "endTime": "2026-05-20T15:30",
+      "location": "圖書館 B204",
+      "description": "討論 OOP final project 分工",
+      "color": "#A7C7E7",
+      "tag": "學業"
+    },
+    {
+      "title": "英文報告練習",
+      "startTime": "2026-05-21T19:00",
+      "endTime": "2026-05-21T20:00",
+      "location": "線上",
+      "description": "練習 presentation",
+      "color": "#B8E0D2",
+      "tag": "報告"
+    }
+  ],
+  "todoTasks": [
+    {
+      "title": "完成 OOP 作業",
+      "completed": false
+    },
+    {
+      "title": "錄製 Demo Video",
+      "completed": true
+    },
+    {
+      "title": "整理 UML 圖",
+      "completed": false
+    }
+  ],
+  "timetableEntries": [
+    {
+      "title": "線性代數",
+      "dayOfWeek": "WEDNESDAY",
+      "startTime": "10:00",
+      "endTime": "12:00",
+      "room": "教室 A101",
+      "teacher": "Prof. Lee",
+      "color": "#A7C7E7",
+      "tag": "課程",
+      "semesterStart": "2026-02-17",
+      "semesterEnd": "2026-06-20"
+    },
+    {
+      "title": "物件導向程式設計",
+      "dayOfWeek": "FRIDAY",
+      "startTime": "13:00",
+      "endTime": "16:00",
+      "room": "電腦教室 C302",
+      "teacher": "Prof. Chen",
+      "color": "#F7D6A3",
+      "tag": "課程",
+      "semesterStart": "2026-02-17",
+      "semesterEnd": "2026-06-20"
+    }
+  ]
+}
