@@ -1,0 +1,57 @@
+{
+  "calendarEvents": [
+    {
+      "title": "學期專案檢查點",
+      "startTime": "2026-03-18T16:00",
+      "endTime": "2026-03-18T17:00",
+      "location": "線上",
+      "description": "確認課表展開後能和 calendar event 混排",
+      "color": "#B8E0D2",
+      "tag": "學業"
+    }
+  ],
+  "todoTasks": [
+    {
+      "title": "準備課表展開測試",
+      "completed": true
+    }
+  ],
+  "timetableEntries": [
+    {
+      "title": "線性代數",
+      "dayOfWeek": "WEDNESDAY",
+      "startTime": "10:00",
+      "endTime": "12:00",
+      "room": "教室 A101",
+      "teacher": "Prof. Lee",
+      "color": "#A7C7E7",
+      "tag": "課程",
+      "semesterStart": "2026-02-17",
+      "semesterEnd": "2026-06-20"
+    },
+    {
+      "title": "資料結構",
+      "dayOfWeek": "MONDAY",
+      "startTime": "09:00",
+      "endTime": "12:00",
+      "room": "教室 B305",
+      "teacher": "Prof. Wang",
+      "color": "#B8E0D2",
+      "tag": "課程",
+      "semesterStart": "2026-02-17",
+      "semesterEnd": "2026-06-20"
+    },
+    {
+      "title": "英文",
+      "dayOfWeek": "THURSDAY",
+      "startTime": "13:00",
+      "endTime": "15:00",
+      "room": "教室 D210",
+      "teacher": "Prof. Lin",
+      "color": "#F7D6A3",
+      "tag": "課程",
+      "semesterStart": "2026-03-01",
+      "semesterEnd": "2026-05-31"
+    }
+  ]
+}
