@@ -86,6 +86,9 @@ public class ScheduleService {
 
     public void addTimetable(TimetableData timetable) {
         Objects.requireNonNull(timetable, "timetable must not be null");
+        if (findTimetable(timetable.getId()).isPresent()) {
+            return;
+        }
         data.getTimetables().add(timetable);
         saveData();
     }
@@ -96,6 +99,34 @@ public class ScheduleService {
         TimetableData timetable = findTimetable(timetableId)
             .orElseThrow(() -> new IllegalArgumentException("Unknown timetable id: " + timetableId));
         timetable.getClasses().add(entry);
+        saveData();
+    }
+
+    public void updateTimetable(String timetableId, String title,
+                                LocalDate startDate, LocalDate endDate) {
+        Objects.requireNonNull(timetableId, "timetableId must not be null");
+        TimetableData timetable = findTimetable(timetableId)
+            .orElseThrow(() -> new IllegalArgumentException("Unknown timetable id: " + timetableId));
+        timetable.setTitle(title);
+        timetable.setStartDate(startDate);
+        timetable.setEndDate(endDate);
+        saveData();
+    }
+
+    public void deleteTimetable(String timetableId) {
+        Objects.requireNonNull(timetableId, "timetableId must not be null");
+        boolean removed = data.getTimetables().removeIf(timetable ->
+            timetable != null && timetableId.equals(timetable.getId()));
+        if (removed) {
+            saveData();
+        }
+    }
+
+    public void replaceTimetableClasses(String timetableId, List<TimetableEntry> entries) {
+        Objects.requireNonNull(timetableId, "timetableId must not be null");
+        TimetableData timetable = findTimetable(timetableId)
+            .orElseThrow(() -> new IllegalArgumentException("Unknown timetable id: " + timetableId));
+        timetable.setClasses(entries == null ? new ArrayList<>() : new ArrayList<>(entries));
         saveData();
     }
 

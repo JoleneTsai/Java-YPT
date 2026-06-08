@@ -15,8 +15,8 @@ import java.time.LocalDate;
  *
  * Form fields:
  *   Title (TextField)  — semester name, e.g. "113-2 Semester Spring"
- *   Start (DatePicker) — first day of the semester
- *   End   (DatePicker) — last day of the semester
+ *   SemStart (DatePicker) — first day of the semester
+ *   SemEnd   (DatePicker) — last day of the semester
  *
  * Save flow:
  *   Validates inputs → calls ctrl.saveNewTimetable(title, start, end).
@@ -99,9 +99,9 @@ public class TimetableCreatePane extends VBox {
             formRow("Title", titleField),
             titleError,
             separator(),
-            dateRow("Start", startPicker),
+            dateRow("SemStart", startPicker),
             separator(),
-            dateRow("End",   endPicker),
+            dateRow("SemEnd",   endPicker),
             dateError,
             separator()
         );
@@ -114,8 +114,8 @@ public class TimetableCreatePane extends VBox {
     private HBox formRow(String labelText, TextField field) {
         Label lbl = new Label(labelText);
         lbl.getStyleClass().add("tt-form-label");
-        lbl.setPrefWidth(70);
-        lbl.setMinWidth(70);
+        lbl.setPrefWidth(86);
+        lbl.setMinWidth(86);
 
         HBox row = new HBox(12, lbl, field);
         row.setAlignment(Pos.CENTER_LEFT);
@@ -127,8 +127,8 @@ public class TimetableCreatePane extends VBox {
     private HBox dateRow(String labelText, DatePicker picker) {
         Label lbl = new Label(labelText);
         lbl.getStyleClass().add("tt-form-label");
-        lbl.setPrefWidth(70);
-        lbl.setMinWidth(70);
+        lbl.setPrefWidth(86);
+        lbl.setMinWidth(86);
 
         picker.setMaxWidth(Double.MAX_VALUE);
         picker.getStyleClass().add("tt-date-picker");

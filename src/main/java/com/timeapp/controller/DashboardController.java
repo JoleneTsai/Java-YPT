@@ -3,17 +3,23 @@ package com.timeapp.controller;
 import com.timeapp.domain.model.ScheduleData;
 import com.timeapp.domain.model.TimetableData;
 import com.timeapp.domain.model.TimetableEntry;
+import com.timeapp.domain.model.ToDoTask;
 import com.timeapp.domain.repository.JsonScheduleRepository;
 import com.timeapp.domain.service.ScheduleService;
 import com.timeapp.domain.service.TimelineBuilder;
 import com.timeapp.domain.service.TimetableExpander;
-import com.timeapp.model.*;
+import com.timeapp.ui.model.*;
 import javafx.animation.*;
 import javafx.beans.property.*;
 import javafx.collections.*;
-import javafx.scene.layout.Pane;
+import javafx.scene.Node;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
 import javafx.util.Duration;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -23,20 +29,20 @@ import java.util.*;
  * Owns all state and provides action methods called by the view.
  * The view observes properties; the controller never touches UI nodes directly.
  *
- * ── Merge notes ───────────────────────────────────────────────────────────────
- * Base: Project A (ypt_todo_no_deadline-merged) — authoritative logic source.
+ * ?? Merge notes ???????????????????????????????????????????????????????????????
+ * Base: Project A (ypt_todo_no_deadline-merged) ??authoritative logic source.
  * Added: {@code activePanel} StringProperty (from Project B) so that
  *        DashboardView can observe when to swap between the Timeline section
  *        and the Timetable section.  All timetable sub-panel routing methods
  *        (showTimetableList, showAddClassPane, etc.) and the date-range
  *        filtering in addActiveTimetableClasses() are kept exactly as in A.
- * ─────────────────────────────────────────────────────────────────────────────
+ * ?????????????????????????????????????????????????????????????????????????????
  */
 public class DashboardController {
 
-    private static final String DATA_FILE_PATH = "schedule-data.json";
+    private static final String DATA_FILE_PATH = resolveDataFilePath();
 
-    // ── Timeline state ────────────────────────────────────────────────────────
+    // ?? Timeline state ????????????????????????????????????????????????????????
 
     /** The week whose Sunday starts the week strip. */
     private final ObjectProperty<LocalDate> weekStart =
@@ -56,7 +62,7 @@ public class DashboardController {
     private final ObservableList<TimeEntry> dayEntries =
             FXCollections.observableArrayList();
 
-    // ── Timetable domain state ────────────────────────────────────────────────
+    // ?? Timetable domain state ????????????????????????????????????????????????
 
     /** All semester timetables created in the UI. */
     private final ObservableList<TimeTable> timetableList =
@@ -70,37 +76,38 @@ public class DashboardController {
     private final StringProperty activeTimetablePane =
             new SimpleStringProperty("MAIN");
 
-    // ── Top-level panel routing ───────────────────────────────────────────────
+    // ?? Top-level panel routing ???????????????????????????????????????????????
 
     /**
      * Which top-level section DashboardView shows.
-     *   "TIMELINE"  → TimelinePane  (default)
-     *   "TIMETABLE" → TimetableMainPane
+     *   "TIMELINE"  ??TimelinePane  (default)
+     *   "TIMETABLE" ??TimetableMainPane
      *
      * DashboardView observes this property and animates the swap.
      */
     private final StringProperty activePanel =
             new SimpleStringProperty("TIMELINE");
 
-    // ── Formatters ────────────────────────────────────────────────────────────
+    // ?? Formatters ????????????????????????????????????????????????????????????
 
     public static final DateTimeFormatter HEADER_FMT =
             DateTimeFormatter.ofPattern("EEE, MMM d");
 
-    // ── Sidebar animation wiring ──────────────────────────────────────────────
+    // ?? Sidebar animation wiring ??????????????????????????????????????????????
 
     private Pane     sidebarPane;
     private Timeline sidebarTimeline;
     private static final double SIDEBAR_WIDTH = 260;
 
-    // ── Persistence wiring ───────────────────────────────────────────────────
+    // ?? Persistence wiring ???????????????????????????????????????????????????
 
     private final ScheduleService scheduleService;
     private final Map<String, String> persistedTimetableIdsByUiId = new HashMap<>();
 
-    // ── Constructor ───────────────────────────────────────────────────────────
+    // ?? Constructor ???????????????????????????????????????????????????????????
 
     public DashboardController() {
+        System.out.println("[TimeFlow] Data file: " + DATA_FILE_PATH);
         scheduleService = new ScheduleService(
             new JsonScheduleRepository(DATA_FILE_PATH),
             new TimetableExpander(),
@@ -114,7 +121,7 @@ public class DashboardController {
         activeTimetable.addListener((obs, o, n) -> loadEntriesForDay(selectedDay.get()));
     }
 
-    // ── Timeline actions ──────────────────────────────────────────────────────
+    // ?? Timeline actions ??????????????????????????????????????????????????????
 
     public void toggleSidebar() {
         sidebarOpen.set(!sidebarOpen.get());
@@ -148,18 +155,108 @@ public class DashboardController {
 
     public void onAddSchedule() {
         collapseFab();
-        System.out.println("[Action] Open Add Schedule dialog");
+        showAddScheduleDialog();
     }
 
     public void onAddTodo() {
         collapseFab();
-        System.out.println("[Action] Open Add To-Do dialog");
+        showAddTodoDialog();
     }
 
-    // ── Navigation ────────────────────────────────────────────────────────────
+    private void showAddScheduleDialog() {
+        Dialog<com.timeapp.domain.model.CalendarEvent> dialog = new Dialog<>();
+        dialog.setTitle("Add Schedule");
+
+        ButtonType saveButtonType = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveButtonType, ButtonType.CANCEL);
+
+        TextField titleField = new TextField();
+        titleField.setPromptText("Title");
+        TextField locationField = new TextField();
+        locationField.setPromptText("Location");
+        TextArea descriptionArea = new TextArea();
+        descriptionArea.setPromptText("Description");
+        descriptionArea.setPrefRowCount(3);
+        DatePicker datePicker = new DatePicker(selectedDay.get());
+        ComboBox<LocalTime> startBox = buildTimeCombo();
+        ComboBox<LocalTime> endBox = buildTimeCombo();
+        startBox.setValue(LocalTime.of(9, 0));
+        endBox.setValue(LocalTime.of(10, 0));
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new javafx.geometry.Insets(12));
+        grid.addRow(0, new Label("Title"), titleField);
+        grid.addRow(1, new Label("Date"), datePicker);
+        grid.addRow(2, new Label("Start"), startBox);
+        grid.addRow(3, new Label("End"), endBox);
+        grid.addRow(4, new Label("Location"), locationField);
+        grid.addRow(5, new Label("Description"), descriptionArea);
+        GridPane.setHgrow(titleField, Priority.ALWAYS);
+        GridPane.setHgrow(locationField, Priority.ALWAYS);
+        GridPane.setHgrow(descriptionArea, Priority.ALWAYS);
+
+        Node saveButton = dialog.getDialogPane().lookupButton(saveButtonType);
+        Runnable updateSaveState = () -> {
+            LocalTime start = startBox.getValue();
+            LocalTime end = endBox.getValue();
+            saveButton.setDisable(
+                titleField.getText().trim().isEmpty()
+                    || datePicker.getValue() == null
+                    || start == null
+                    || end == null
+                    || !end.isAfter(start)
+            );
+        };
+        titleField.textProperty().addListener((obs, o, n) -> updateSaveState.run());
+        datePicker.valueProperty().addListener((obs, o, n) -> updateSaveState.run());
+        startBox.valueProperty().addListener((obs, o, n) -> updateSaveState.run());
+        endBox.valueProperty().addListener((obs, o, n) -> updateSaveState.run());
+        updateSaveState.run();
+
+        dialog.getDialogPane().setContent(grid);
+        dialog.setResultConverter(button -> {
+            if (button != saveButtonType) {
+                return null;
+            }
+            LocalDate date = datePicker.getValue();
+            return new com.timeapp.domain.model.CalendarEvent(
+                titleField.getText().trim(),
+                LocalDateTime.of(date, startBox.getValue()),
+                LocalDateTime.of(date, endBox.getValue()),
+                locationField.getText().trim(),
+                descriptionArea.getText().trim(),
+                "#4A9EFF",
+                "schedule"
+            );
+        });
+
+        dialog.showAndWait().ifPresent(event -> {
+            scheduleService.addCalendarEvent(event);
+            loadEntriesForDay(selectedDay.get());
+        });
+    }
+
+    private void showAddTodoDialog() {
+        TextInputDialog dialog = new TextInputDialog();
+        dialog.setTitle("Add To-Do");
+        dialog.setHeaderText("Add To-Do");
+        dialog.setContentText("Title");
+
+        dialog.showAndWait()
+            .map(String::trim)
+            .filter(title -> !title.isEmpty())
+            .ifPresent(title -> {
+                scheduleService.addToDoTask(new ToDoTask(title, false));
+                loadEntriesForDay(selectedDay.get());
+            });
+    }
+
+    // ?? Navigation ????????????????????????????????????????????????????????????
 
     /**
-     * Primary navigation — called by SidebarDrawer when the user taps a nav item.
+     * Primary navigation ??called by SidebarDrawer when the user taps a nav item.
      *
      * Sets {@code activePanel} so DashboardView animates the section swap,
      * then resets the timetable sub-panel to MAIN whenever the user enters
@@ -175,24 +272,24 @@ public class DashboardController {
             }
             case "TimeLine"  -> activePanel.set("TIMELINE");
             case "Calendar"  -> {
-                // Calendar section not yet implemented — stay on timeline
+                // Calendar section not yet implemented ??stay on timeline
                 activePanel.set("TIMELINE");
-                System.out.println("[Navigation] Calendar — not yet implemented");
+                System.out.println("[Navigation] Calendar ??not yet implemented");
             }
             default -> System.out.println("[Navigation] Unknown view: " + viewName);
         }
     }
 
-    // ── Timetable sub-panel routing ───────────────────────────────────────────
+    // ?? Timetable sub-panel routing ???????????????????????????????????????????
 
-    /** FAB "TimeTable" → show Panel 3. */
+    /** FAB "TimeTable" ??show Panel 3. */
     public void showTimetableList() {
         activeTimetablePane.set("LIST");
         closeSidebar();
         collapseFab();
     }
 
-    /** FAB "Add Class" → show Panel 2. */
+    /** FAB "Add Class" ??show Panel 2. */
     public void showAddClassPane() {
         ensureActiveTimetable();
         activeTimetablePane.set("ADD");
@@ -200,24 +297,24 @@ public class DashboardController {
         collapseFab();
     }
 
-    /** Panel 3 mini-FAB → show Panel 4. */
+    /** Panel 3 mini-FAB ??show Panel 4. */
     public void showCreateTimetable() {
         activeTimetablePane.set("CREATE");
         closeSidebar();
         collapseFab();
     }
 
-    /** Back arrow in Panel 2, 3 → return to Panel 1. */
+    /** Back arrow in Panel 2, 3 ??return to Panel 1. */
     public void backToTimetableMain() {
         activeTimetablePane.set("MAIN");
     }
 
-    /** Back arrow in Panel 4 → return to Panel 3. */
+    /** Back arrow in Panel 4 ??return to Panel 3. */
     public void backToTimetableList() {
         activeTimetablePane.set("LIST");
     }
 
-    // ── Timetable domain actions ──────────────────────────────────────────────
+    // ?? Timetable domain actions ??????????????????????????????????????????????
 
     /**
      * Saves a {@link TimetableClassRecord} into the active timetable,
@@ -226,6 +323,7 @@ public class DashboardController {
     public void saveClass(TimetableClassRecord record) {
         if (record == null) return;
         ensureActiveTimetable();
+        if (!hasAnyValidTimeSlot(record)) return;
         activeTimetable.get().getClasses().add(record);
         persistClassRecord(record, activeTimetable.get());
         loadEntriesForDay(selectedDay.get());
@@ -250,7 +348,173 @@ public class DashboardController {
         // activeTimetable listener fires loadEntriesForDay automatically
     }
 
-    // ── Sidebar animation ─────────────────────────────────────────────────────
+    public void editTimetable(TimeTable timetable) {
+        if (timetable == null) return;
+
+        Dialog<Boolean> dialog = new Dialog<>();
+        dialog.setTitle("Edit TimeTable");
+        ButtonType saveButtonType = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveButtonType, ButtonType.CANCEL);
+
+        TextField titleField = new TextField(timetable.getTitle());
+        DatePicker startPicker = new DatePicker(timetable.getStartDate());
+        DatePicker endPicker = new DatePicker(timetable.getEndDate());
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new javafx.geometry.Insets(12));
+        grid.addRow(0, new Label("Title"), titleField);
+        grid.addRow(1, new Label("SemStart"), startPicker);
+        grid.addRow(2, new Label("SemEnd"), endPicker);
+        GridPane.setHgrow(titleField, Priority.ALWAYS);
+
+        Node saveButton = dialog.getDialogPane().lookupButton(saveButtonType);
+        Runnable updateSaveState = () -> saveButton.setDisable(
+            titleField.getText().trim().isEmpty()
+                || startPicker.getValue() == null
+                || endPicker.getValue() == null
+                || !endPicker.getValue().isAfter(startPicker.getValue())
+        );
+        titleField.textProperty().addListener((obs, o, n) -> updateSaveState.run());
+        startPicker.valueProperty().addListener((obs, o, n) -> updateSaveState.run());
+        endPicker.valueProperty().addListener((obs, o, n) -> updateSaveState.run());
+        updateSaveState.run();
+
+        dialog.getDialogPane().setContent(grid);
+        dialog.setResultConverter(button -> button == saveButtonType);
+        dialog.showAndWait().filter(Boolean::booleanValue).ifPresent(saved -> {
+            timetable.setTitle(titleField.getText().trim());
+            timetable.setStartDate(startPicker.getValue());
+            timetable.setEndDate(endPicker.getValue());
+
+            String timetableId = ensurePersistedTimetable(timetable);
+            scheduleService.updateTimetable(
+                timetableId,
+                timetable.getTitle(),
+                timetable.getStartDate(),
+                timetable.getEndDate()
+            );
+            rebuildPersistedClasses(timetable);
+            loadEntriesForDay(selectedDay.get());
+        });
+    }
+
+    public void deleteTimetable(TimeTable timetable) {
+        if (timetable == null) return;
+        if (!confirm("Delete TimeTable", "Delete \"" + timetable.getTitle() + "\"?")) {
+            return;
+        }
+
+        String timetableId = persistedTimetableIdsByUiId.remove(timetable.getId());
+        timetableList.remove(timetable);
+        if (timetableId != null) {
+            scheduleService.deleteTimetable(timetableId);
+        }
+
+        if (timetable.equals(activeTimetable.get())) {
+            activeTimetable.set(timetableList.isEmpty() ? null : timetableList.get(0));
+        }
+        loadEntriesForDay(selectedDay.get());
+    }
+
+    public void editClass(TimetableClassRecord record) {
+        TimeTable timetable = activeTimetable.get();
+        if (record == null || timetable == null) return;
+
+        Dialog<Boolean> dialog = new Dialog<>();
+        dialog.setTitle("Edit Class");
+        ButtonType saveButtonType = new ButtonType("Save", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(saveButtonType, ButtonType.CANCEL);
+
+        TextField subjectField = new TextField(record.getSubject());
+        TextField teacherField = new TextField(record.getTeacher());
+        TextField classroomField = new TextField(record.getClassroom());
+        ComboBox<TimetableClassRecord.AccentColor> colorBox = new ComboBox<>();
+        colorBox.getItems().addAll(TimetableClassRecord.AccentColor.values());
+        colorBox.setValue(record.getAccentColor());
+
+        VBox slotBox = new VBox(8);
+        List<ComboBox<DayOfWeek>> dayBoxes = new ArrayList<>();
+        List<ComboBox<LocalTime>> startBoxes = new ArrayList<>();
+        List<ComboBox<LocalTime>> endBoxes = new ArrayList<>();
+        List<TimetableClassRecord.ClassTimeSlot> slots = record.getTimeSlots().isEmpty()
+            ? List.of(new TimetableClassRecord.ClassTimeSlot(DayOfWeek.MONDAY, LocalTime.of(9, 0), LocalTime.of(10, 0)))
+            : new ArrayList<>(record.getTimeSlots());
+
+        for (TimetableClassRecord.ClassTimeSlot slot : slots) {
+            ComboBox<DayOfWeek> dayBox = new ComboBox<>();
+            dayBox.getItems().addAll(DayOfWeek.values());
+            dayBox.setValue(slot.getDayOfWeek());
+            ComboBox<LocalTime> startBox = buildTimeCombo();
+            startBox.setValue(slot.getStartTime());
+            ComboBox<LocalTime> endBox = buildTimeCombo();
+            endBox.setValue(slot.getEndTime());
+
+            dayBoxes.add(dayBox);
+            startBoxes.add(startBox);
+            endBoxes.add(endBox);
+            slotBox.getChildren().add(new HBox(8, dayBox, startBox, new Label("-"), endBox));
+        }
+
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new javafx.geometry.Insets(12));
+        grid.addRow(0, new Label("Subject"), subjectField);
+        grid.addRow(1, new Label("Teacher"), teacherField);
+        grid.addRow(2, new Label("Classroom"), classroomField);
+        grid.addRow(3, new Label("Color"), colorBox);
+        grid.addRow(4, new Label("Times"), slotBox);
+        GridPane.setHgrow(subjectField, Priority.ALWAYS);
+
+        Node saveButton = dialog.getDialogPane().lookupButton(saveButtonType);
+        Runnable updateSaveState = () -> saveButton.setDisable(
+            subjectField.getText().trim().isEmpty()
+                || !hasValidEditorSlots(dayBoxes, startBoxes, endBoxes)
+        );
+        subjectField.textProperty().addListener((obs, o, n) -> updateSaveState.run());
+        for (int i = 0; i < dayBoxes.size(); i++) {
+            dayBoxes.get(i).valueProperty().addListener((obs, o, n) -> updateSaveState.run());
+            startBoxes.get(i).valueProperty().addListener((obs, o, n) -> updateSaveState.run());
+            endBoxes.get(i).valueProperty().addListener((obs, o, n) -> updateSaveState.run());
+        }
+        updateSaveState.run();
+
+        dialog.getDialogPane().setContent(grid);
+        dialog.setResultConverter(button -> button == saveButtonType);
+        dialog.showAndWait().filter(Boolean::booleanValue).ifPresent(saved -> {
+            record.setSubject(subjectField.getText().trim());
+            record.setTeacher(teacherField.getText().trim());
+            record.setClassroom(classroomField.getText().trim());
+            record.setAccentColor(colorBox.getValue());
+            record.getTimeSlots().clear();
+            for (int i = 0; i < dayBoxes.size(); i++) {
+                record.addTimeSlot(new TimetableClassRecord.ClassTimeSlot(
+                    dayBoxes.get(i).getValue(),
+                    startBoxes.get(i).getValue(),
+                    endBoxes.get(i).getValue()
+                ));
+            }
+
+            rebuildPersistedClasses(timetable);
+            loadEntriesForDay(selectedDay.get());
+        });
+    }
+
+    public void deleteClass(TimetableClassRecord record) {
+        TimeTable timetable = activeTimetable.get();
+        if (record == null || timetable == null) return;
+        if (!confirm("Delete Class", "Delete \"" + record.getSubject() + "\"?")) {
+            return;
+        }
+
+        timetable.getClasses().remove(record);
+        rebuildPersistedClasses(timetable);
+        loadEntriesForDay(selectedDay.get());
+    }
+
+    // ?? Sidebar animation ?????????????????????????????????????????????????????
 
     public void wireSidebarPane(Pane sidebar) {
         this.sidebarPane = sidebar;
@@ -269,7 +533,7 @@ public class DashboardController {
         sidebarTimeline.play();
     }
 
-    // ── Entry loading (date-range filtered) ───────────────────────────────────
+    // ?? Entry loading (date-range filtered) ???????????????????????????????????
 
     private void loadEntriesForDay(LocalDate date) {
         dayEntries.clear();
@@ -284,8 +548,9 @@ public class DashboardController {
         // Always: morning to-dos
         list.add(new TodoEntry(LocalTime.of(8,  0), "Review lecture notes"));
         list.add(new TodoEntry(LocalTime.of(8, 30), "Reply to group-project emails"));
+        addPersistedTodos(list);
 
-        // Mon / Wed / Fri — static sample timetable classes (shown when no
+        // Mon / Wed / Fri ??static sample timetable classes (shown when no
         // active timetable is configured, so the app is demo-able immediately)
         if (activeTimetable.get() == null &&
             (dow == DayOfWeek.MONDAY || dow == DayOfWeek.WEDNESDAY || dow == DayOfWeek.FRIDAY)) {
@@ -297,32 +562,71 @@ public class DashboardController {
                 "Linear Algebra", "Room 205, Math Block", "Prof. Sarah Kim"));
         }
 
-        // Classes from the active timetable — gated by semester date range
+        // Classes from the active timetable ??gated by semester date range
         addActiveTimetableClasses(list, date);
 
-        // Tue / Thu — calendar events
+        // Tue / Thu ??calendar events
         if (dow == DayOfWeek.TUESDAY || dow == DayOfWeek.THURSDAY) {
             list.add(new CalendarEvent(
                 LocalTime.of(10, 0), LocalTime.of(11, 0),
-                "Team Sprint Planning", "Zoom — link in calendar"));
+                "Team Sprint Planning", "Zoom ??link in calendar"));
             list.add(new CalendarEvent(
                 LocalTime.of(15, 0), LocalTime.of(16, 30),
                 "Library Study Session", "Central Library, 3F"));
         }
 
+        addPersistedCalendarEvents(list, date);
+
         // Every day
         list.add(new TodoEntry(LocalTime.of(12, 0), "Lunch & short walk"));
         list.add(new CalendarEvent(
             LocalTime.of(19, 0), LocalTime.of(20, 0),
-            "Gym — Cardio Day", "University Sports Centre"));
+            "Gym ??Cardio Day", "University Sports Centre"));
 
         return list;
+    }
+
+    private void addPersistedTodos(List<TimeEntry> list) {
+        List<ToDoTask> tasks = scheduleService.getToDoTasks();
+        if (tasks == null || tasks.isEmpty()) {
+            return;
+        }
+
+        LocalTime time = LocalTime.of(9, 0);
+        for (ToDoTask task : tasks) {
+            if (task == null || task.getTitle() == null || task.getTitle().isBlank()
+                || task.isCompleted()) {
+                continue;
+            }
+            list.add(new TodoEntry(time, task.getTitle()));
+            time = time.plusMinutes(30);
+        }
+    }
+
+    private void addPersistedCalendarEvents(List<TimeEntry> list, LocalDate date) {
+        ScheduleData data = scheduleService.getData();
+        if (data == null || data.getCalendarEvents() == null) {
+            return;
+        }
+
+        for (com.timeapp.domain.model.CalendarEvent event : data.getCalendarEvents()) {
+            if (event == null || event.getStartTime() == null || event.getEndTime() == null
+                || !event.getStartTime().toLocalDate().equals(date)) {
+                continue;
+            }
+            list.add(new CalendarEvent(
+                event.getStartTime().toLocalTime(),
+                event.getEndTime().toLocalTime(),
+                nullToDefault(event.getTitle(), "Schedule"),
+                nullToEmpty(event.getLocation())
+            ));
+        }
     }
 
     /**
      * Appends TimetableClass entries for today from the active timetable.
      *
-     * ── Date-range contract ───────────────────────────────────────────────────
+     * ?? Date-range contract ???????????????????????????????????????????????????
      * Classes are included ONLY when:
      *   a) A class record has a time slot matching today's DayOfWeek.
      *   b) today falls within [activeTimetable.startDate, activeTimetable.endDate].
@@ -345,7 +649,7 @@ public class DashboardController {
         }
     }
 
-    // ── Sample seed data ──────────────────────────────────────────────────────
+    // ?? Sample seed data ??????????????????????????????????????????????????????
 
     private void seedTimetables() {
         if (!timetableList.isEmpty()) return;
@@ -399,11 +703,25 @@ public class DashboardController {
             persistedTimetableIdsByUiId.put(timetable.getId(), saved.getId());
 
             if (saved.getClasses() == null) continue;
+            Map<String, TimetableClassRecord> recordsByClass = new LinkedHashMap<>();
             for (TimetableEntry entry : saved.getClasses()) {
-                TimetableClassRecord record = toUiClassRecord(entry);
-                if (record != null) {
-                    timetable.getClasses().add(record);
+                if (!hasValidTime(entry)) {
+                    continue;
                 }
+
+                String classKey = classIdentityKey(entry);
+                TimetableClassRecord record = recordsByClass.computeIfAbsent(classKey, key -> {
+                    TimetableClassRecord created = new TimetableClassRecord(
+                        nullToEmpty(entry.getTitle()),
+                        nullToEmpty(entry.getTeacher()),
+                        nullToEmpty(entry.getRoom()),
+                        accentColorFromHex(entry.getColor())
+                    );
+                    timetable.getClasses().add(created);
+                    return created;
+                });
+
+                record.addTimeSlot(toUiTimeSlot(entry));
             }
         }
 
@@ -422,8 +740,7 @@ public class DashboardController {
         boolean migratedLegacyEntries = false;
 
         for (TimetableEntry entry : entries) {
-            if (entry == null || entry.getDayOfWeek() == null
-                || entry.getStartTime() == null || entry.getEndTime() == null) {
+            if (!hasValidTime(entry)) {
                 continue;
             }
 
@@ -442,11 +759,7 @@ public class DashboardController {
                 return created;
             });
 
-            String classKey = rangeKey + "|"
-                + nullToEmpty(entry.getTitle()) + "|"
-                + nullToEmpty(entry.getTeacher()) + "|"
-                + nullToEmpty(entry.getRoom()) + "|"
-                + nullToEmpty(entry.getColor());
+            String classKey = rangeKey + "|" + classIdentityKey(entry);
 
             TimetableClassRecord record = recordsByClass.computeIfAbsent(classKey, key -> {
                 TimetableClassRecord created = new TimetableClassRecord(
@@ -459,11 +772,7 @@ public class DashboardController {
                 return created;
             });
 
-            record.addTimeSlot(new TimetableClassRecord.ClassTimeSlot(
-                entry.getDayOfWeek(),
-                entry.getStartTime(),
-                entry.getEndTime()
-            ));
+            record.addTimeSlot(toUiTimeSlot(entry));
             scheduleService.addClassToTimetable(ensurePersistedTimetable(timetable), entry);
             migratedLegacyEntries = true;
         }
@@ -495,11 +804,100 @@ public class DashboardController {
                 record.getClassroom(),
                 record.getTeacher(),
                 record.getAccentColor() != null ? record.getAccentColor().strip : null,
-                "課程",
+                "隤脩?",
                 timetable.getStartDate(),
                 timetable.getEndDate()
             ));
         }
+    }
+
+    private void rebuildPersistedClasses(TimeTable timetable) {
+        if (timetable == null) {
+            return;
+        }
+
+        String timetableId = ensurePersistedTimetable(timetable);
+        List<TimetableEntry> entries = new ArrayList<>();
+        for (TimetableClassRecord record : timetable.getClasses()) {
+            if (record == null || record.getTimeSlots() == null) {
+                continue;
+            }
+            for (TimetableClassRecord.ClassTimeSlot slot : record.getTimeSlots()) {
+                if (slot == null || slot.getDayOfWeek() == null
+                    || slot.getStartTime() == null || slot.getEndTime() == null) {
+                    continue;
+                }
+                entries.add(toDomainEntry(record, slot, timetable));
+            }
+        }
+        scheduleService.replaceTimetableClasses(timetableId, entries);
+    }
+
+    private TimetableEntry toDomainEntry(TimetableClassRecord record,
+                                         TimetableClassRecord.ClassTimeSlot slot,
+                                         TimeTable timetable) {
+        return new TimetableEntry(
+            record.getSubject(),
+            slot.getDayOfWeek(),
+            slot.getStartTime(),
+            slot.getEndTime(),
+            record.getClassroom(),
+            record.getTeacher(),
+            record.getAccentColor() != null ? record.getAccentColor().strip : null,
+            "class",
+            timetable.getStartDate(),
+            timetable.getEndDate()
+        );
+    }
+
+    private boolean hasAnyValidTimeSlot(TimetableClassRecord record) {
+        if (record.getTimeSlots() == null) {
+            return false;
+        }
+        for (TimetableClassRecord.ClassTimeSlot slot : record.getTimeSlots()) {
+            if (slot != null && slot.getDayOfWeek() != null
+                && slot.getStartTime() != null && slot.getEndTime() != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasValidEditorSlots(List<ComboBox<DayOfWeek>> dayBoxes,
+                                        List<ComboBox<LocalTime>> startBoxes,
+                                        List<ComboBox<LocalTime>> endBoxes) {
+        if (dayBoxes.isEmpty()) {
+            return false;
+        }
+        for (int i = 0; i < dayBoxes.size(); i++) {
+            LocalTime start = startBoxes.get(i).getValue();
+            LocalTime end = endBoxes.get(i).getValue();
+            if (dayBoxes.get(i).getValue() == null || start == null || end == null
+                || !end.isAfter(start)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private ComboBox<LocalTime> buildTimeCombo() {
+        ComboBox<LocalTime> combo = new ComboBox<>();
+        for (int hour = 7; hour <= 22; hour++) {
+            combo.getItems().add(LocalTime.of(hour, 0));
+            if (hour < 22) {
+                combo.getItems().add(LocalTime.of(hour, 30));
+            }
+        }
+        combo.setPrefWidth(100);
+        return combo;
+    }
+
+    private boolean confirm(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle(title);
+        alert.setHeaderText(message);
+        alert.setContentText(null);
+        return alert.showAndWait().filter(ButtonType.OK::equals).isPresent();
     }
 
     private void persistTimetable(TimeTable timetable) {
@@ -523,24 +921,26 @@ public class DashboardController {
         return persistedTimetableIdsByUiId.get(timetable.getId());
     }
 
-    private TimetableClassRecord toUiClassRecord(TimetableEntry entry) {
-        if (entry == null || entry.getDayOfWeek() == null
-            || entry.getStartTime() == null || entry.getEndTime() == null) {
-            return null;
-        }
+    private boolean hasValidTime(TimetableEntry entry) {
+        return entry != null
+            && entry.getDayOfWeek() != null
+            && entry.getStartTime() != null
+            && entry.getEndTime() != null;
+    }
 
-        TimetableClassRecord record = new TimetableClassRecord(
-            nullToEmpty(entry.getTitle()),
-            nullToEmpty(entry.getTeacher()),
-            nullToEmpty(entry.getRoom()),
-            accentColorFromHex(entry.getColor())
-        );
-        record.addTimeSlot(new TimetableClassRecord.ClassTimeSlot(
+    private String classIdentityKey(TimetableEntry entry) {
+        return nullToEmpty(entry.getTitle()) + "|"
+            + nullToEmpty(entry.getTeacher()) + "|"
+            + nullToEmpty(entry.getRoom()) + "|"
+            + nullToEmpty(entry.getColor());
+    }
+
+    private TimetableClassRecord.ClassTimeSlot toUiTimeSlot(TimetableEntry entry) {
+        return new TimetableClassRecord.ClassTimeSlot(
             entry.getDayOfWeek(),
             entry.getStartTime(),
             entry.getEndTime()
-        ));
-        return record;
+        );
     }
 
     private TimetableClassRecord.AccentColor accentColorFromHex(String hex) {
@@ -562,7 +962,7 @@ public class DashboardController {
         return value == null || value.isBlank() ? fallback : value;
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ?? Helpers ???????????????????????????????????????????????????????????????
 
     public static LocalDate sundayOf(LocalDate date) {
         return date.minusDays(date.getDayOfWeek().getValue() % 7);
@@ -572,7 +972,7 @@ public class DashboardController {
         if (activeTimetable.get() == null) seedTimetables();
     }
 
-    // ── Property accessors ────────────────────────────────────────────────────
+    // ?? Property accessors ????????????????????????????????????????????????????
 
     public ObjectProperty<LocalDate>    weekStartProperty()          { return weekStart; }
     public ObjectProperty<LocalDate>    selectedDayProperty()        { return selectedDay; }
@@ -590,4 +990,26 @@ public class DashboardController {
     public boolean    isFabExpanded()        { return fabExpanded.get(); }
     public TimeTable  getActiveTimetable()   { return activeTimetable.get(); }
     public String     getActivePanel()       { return activePanel.get(); }
+
+    /**
+     * Keeps schedule-data.json stable even when the app is launched from an IDE
+     * or a nested folder with a different working directory.
+     */
+    private static String resolveDataFilePath() {
+        String fileName = "schedule-data.json";
+        Path workingFile = Paths.get(fileName).toAbsolutePath().normalize();
+        if (Files.exists(workingFile)) {
+            return workingFile.toString();
+        }
+
+        Path dir = Paths.get(System.getProperty("user.dir")).toAbsolutePath().normalize();
+        while (dir != null) {
+            if (Files.exists(dir.resolve("pom.xml"))) {
+                return dir.resolve(fileName).toString();
+            }
+            dir = dir.getParent();
+        }
+
+        return workingFile.toString();
+    }
 }

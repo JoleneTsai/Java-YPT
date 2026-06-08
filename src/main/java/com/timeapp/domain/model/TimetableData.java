@@ -8,7 +8,7 @@ import java.util.UUID;
 /**
  * Persisted timetable container.
  *
- * This is separate from com.timeapp.model.TimeTable, which is a JavaFX UI model.
+ * This is separate from com.timeapp.ui.model.TimeTable, which is a JavaFX UI model.
  * TimetableData is plain Java and is safe for JSON storage.
  */
 public class TimetableData {

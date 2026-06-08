@@ -1,4 +1,4 @@
-package com.timeapp.model;
+package com.timeapp.ui.model;
 
 import javafx.beans.property.*;
 import javafx.collections.*;
@@ -11,25 +11,25 @@ import java.util.UUID;
  * Represents one semester / timetable container.
  *
  * Holds:
- *  • A human-readable title     ("113-2 Semester Spring")
- *  • A semester date range      (start … end)
- *  • An observable list of      TimetableClassRecord objects (the enrolled classes)
- *  • A unique ID for persistence
+ *  ??A human-readable title     ("113-2 Semester Spring")
+ *  ??A semester date range      (start ??end)
+ *  ??An observable list of      TimetableClassRecord objects (the enrolled classes)
+ *  ??A unique ID for persistence
  *
- * ── Timeline filtering contract ──────────────────────────────────────────────
+ * ?? Timeline filtering contract ??????????????????????????????????????????????
  * DashboardController.getDayEntries() must check {@link #isDateInRange(LocalDate)}
  * before appending a recurring TimetableClass to the daily list.  Classes from
  * this timetable are ONLY shown when:
  *    start <= queryDate <= end
  * This ensures that past or future semesters do not pollute the live timeline.
- * ─────────────────────────────────────────────────────────────────────────────
+ * ?????????????????????????????????????????????????????????????????????????????
  */
 public class TimeTable {
 
     private static final DateTimeFormatter DATE_FMT =
             DateTimeFormatter.ofPattern("yyyy/MM/dd");
 
-    // ── Fields ────────────────────────────────────────────────────────────────
+    // ?? Fields ????????????????????????????????????????????????????????????????
 
     private final String id;
 
@@ -43,7 +43,7 @@ public class TimeTable {
     private final ObservableList<TimetableClassRecord> classes =
             FXCollections.observableArrayList();
 
-    // ── Constructors ──────────────────────────────────────────────────────────
+    // ?? Constructors ??????????????????????????????????????????????????????????
 
     public TimeTable(String title, LocalDate start, LocalDate end) {
         this.id = UUID.randomUUID().toString();
@@ -59,7 +59,7 @@ public class TimeTable {
                              today.withDayOfMonth(1).plusMonths(5).minusDays(1));
     }
 
-    // ── Business logic ────────────────────────────────────────────────────────
+    // ?? Business logic ????????????????????????????????????????????????????????
 
     /**
      * Returns true if {@code date} falls within [startDate, endDate] inclusive.
@@ -73,16 +73,16 @@ public class TimeTable {
         return !date.isBefore(s) && !date.isAfter(e);
     }
 
-    /** Human-readable date range string, e.g. "2025/02/17 – 2025/07/18" */
+    /** Human-readable date range string, e.g. "2025/02/17 ??2025/07/18" */
     public String getDateRangeDisplay() {
         LocalDate s = startDate.get();
         LocalDate e = endDate.get();
-        String start = s != null ? s.format(DATE_FMT) : "—";
-        String end   = e != null ? e.format(DATE_FMT) : "—";
-        return start + " – " + end;
+        String start = s != null ? s.format(DATE_FMT) : "N/A";
+        String end   = e != null ? e.format(DATE_FMT) : "N/A";
+        return start + " - " + end;
     }
 
-    // ── Property accessors ────────────────────────────────────────────────────
+    // ?? Property accessors ????????????????????????????????????????????????????
 
     public String                                getId()           { return id; }
     public String                                getTitle()        { return title.get(); }

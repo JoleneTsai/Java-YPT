@@ -1,6 +1,6 @@
 package com.timeapp.view;
 
-import com.timeapp.model.*;
+import com.timeapp.ui.model.*;
 import javafx.collections.*;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
@@ -18,9 +18,9 @@ import java.util.List;
  *
  * Layout anatomy:
  *   ScrollPane
- *     └─ AnchorPane (canvas)
- *          ├─ VBox  (hour rows — left gutter + divider lines)
- *          └─ For each TimeEntry: a positioned node on the right side
+ *     ?? AnchorPane (canvas)
+ *          ?? VBox  (hour rows ??left gutter + divider lines)
+ *          ?? For each TimeEntry: a positioned node on the right side
  *
  * Pixel math:
  *   ROW_H   = 64 px  per 60 minutes
@@ -29,7 +29,7 @@ import java.util.List;
  */
 public class TimelinePane {
 
-    // ── Layout constants ──────────────────────────────────────────────────────
+    // ?? Layout constants ??????????????????????????????????????????????????????
     public static final double ROW_H    = 64;  // px per hour
     public static final double GUTTER   = 56;  // left label column
     public static final double PADDING  = 8;   // top gap
@@ -39,11 +39,11 @@ public class TimelinePane {
     private static final DateTimeFormatter T_FMT =
             DateTimeFormatter.ofPattern("HH:mm");
 
-    // ── Root node ─────────────────────────────────────────────────────────────
+    // ?? Root node ?????????????????????????????????????????????????????????????
     private final ScrollPane scrollPane;
     private final AnchorPane canvas;
 
-    // ── Width of the card area ────────────────────────────────────────────────
+    // ?? Width of the card area ????????????????????????????????????????????????
     private final double totalWidth;
 
     public TimelinePane(double totalWidth,
@@ -73,11 +73,11 @@ public class TimelinePane {
         scrollPane.setVvalue(0.1); // start near top (08:00 area)
     }
 
-    // ── Public accessor ───────────────────────────────────────────────────────
+    // ?? Public accessor ???????????????????????????????????????????????????????
 
     public ScrollPane getNode() { return scrollPane; }
 
-    // ── Hour grid ─────────────────────────────────────────────────────────────
+    // ?? Hour grid ?????????????????????????????????????????????????????????????
 
     private void buildHourGrid() {
         for (int h = START_H; h <= END_H; h++) {
@@ -109,7 +109,7 @@ public class TimelinePane {
         }
     }
 
-    // ── Entry rendering ───────────────────────────────────────────────────────
+    // ?? Entry rendering ???????????????????????????????????????????????????????
 
     private void renderEntries(List<TimeEntry> entries) {
         for (TimeEntry entry : entries) {
@@ -137,7 +137,7 @@ public class TimelinePane {
         }
     }
 
-    // ── Todo node ─────────────────────────────────────────────────────────────
+    // ?? Todo node ?????????????????????????????????????????????????????????????
 
     private javafx.scene.Node buildTodoNode(TodoEntry todo) {
         HBox box = new HBox(10);
@@ -165,7 +165,7 @@ public class TimelinePane {
         return box;
     }
 
-    // ── Calendar event card ───────────────────────────────────────────────────
+    // ?? Calendar event card ???????????????????????????????????????????????????
 
     private javafx.scene.Node buildCalendarCard(CalendarEvent ev) {
         VBox card = new VBox(3);
@@ -173,7 +173,7 @@ public class TimelinePane {
         card.setPadding(new Insets(8, 10, 8, 12));
 
         Label timeRange = new Label(
-            ev.getStartTime().format(T_FMT) + " – " + ev.getEndTime().format(T_FMT));
+            ev.getStartTime().format(T_FMT) + " ??" + ev.getEndTime().format(T_FMT));
         timeRange.getStyleClass().add("card-time-range");
 
         Label title = new Label(ev.getTitle());
@@ -182,7 +182,7 @@ public class TimelinePane {
 
         HBox locRow = new HBox(4);
         locRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        Label pin  = new Label("📍");
+        Label pin  = new Label("??");
         pin.setStyle("-fx-font-size: 10px;");
         Label loc  = new Label(ev.getLocation());
         loc.getStyleClass().add("card-location");
@@ -207,7 +207,7 @@ public class TimelinePane {
         return outer;
     }
 
-    // ── Timetable class card ──────────────────────────────────────────────────
+    // ?? Timetable class card ??????????????????????????????????????????????????
 
     private javafx.scene.Node buildTimetableCard(TimetableClass cls) {
         VBox card = new VBox(3);
@@ -215,7 +215,7 @@ public class TimelinePane {
         card.setPadding(new Insets(8, 10, 8, 12));
 
         Label timeRange = new Label(
-            cls.getStartTime().format(T_FMT) + " – " + cls.getEndTime().format(T_FMT));
+            cls.getStartTime().format(T_FMT) + " ??" + cls.getEndTime().format(T_FMT));
         timeRange.getStyleClass().add("card-time-range");
 
         Label title = new Label(cls.getTitle());
@@ -224,7 +224,7 @@ public class TimelinePane {
 
         HBox locRow = new HBox(4);
         locRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        Label pin = new Label("🏫");
+        Label pin = new Label("?");
         pin.setStyle("-fx-font-size: 10px;");
         Label loc = new Label(cls.getLocation());
         loc.getStyleClass().add("card-location");
@@ -232,7 +232,7 @@ public class TimelinePane {
 
         HBox profRow = new HBox(4);
         profRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        Label personIcon = new Label("👤");
+        Label personIcon = new Label("?");
         personIcon.setStyle("-fx-font-size: 10px;");
         Label prof = new Label(cls.getProfessor());
         prof.getStyleClass().add("card-professor");
@@ -254,7 +254,7 @@ public class TimelinePane {
         return outer;
     }
 
-    // ── Conversion helpers ────────────────────────────────────────────────────
+    // ?? Conversion helpers ????????????????????????????????????????????????????
 
     private double timeToY(LocalTime t) {
         double hours = t.getHour() + t.getMinute() / 60.0;

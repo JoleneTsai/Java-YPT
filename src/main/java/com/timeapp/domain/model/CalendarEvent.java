@@ -3,16 +3,16 @@ package com.timeapp.domain.model;
 import java.time.LocalDateTime;
 
 /**
- * A one-time calendar event — the domain / persistence model.
+ * A one-time calendar event ??the domain / persistence model.
  *
  * IMPORTANT: This class is intentionally distinct from
- * {@code com.timeapp.model.CalendarEvent}, which is a lightweight
+ * {@code com.timeapp.ui.model.CalendarEvent}, which is a lightweight
  * UI-display object that uses LocalTime only.
  *
  * This domain version:
- *   • Implements Schedulable (uses LocalDateTime — full date + time).
- *   • Carries the full set of persistable fields: color, description, tag.
- *   • Has no JavaFX imports — safe to use in service and repository layers.
+ *   ??Implements Schedulable (uses LocalDateTime ??full date + time).
+ *   ??Carries the full set of persistable fields: color, description, tag.
+ *   ??Has no JavaFX imports ??safe to use in service and repository layers.
  *
  * DashboardController bridges the two by converting domain CalendarEvent
  * objects into UI CalendarEvent objects when building dayEntries.
