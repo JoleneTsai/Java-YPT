@@ -1,6 +1,8 @@
 package com.timeapp.controller;
 
 import com.timeapp.model.*;
+import com.timeapp.repository.JsonScheduleRepository;
+import com.timeapp.service.*;
 import javafx.animation.*;
 import javafx.beans.property.*;
 import javafx.collections.*;
@@ -9,74 +11,56 @@ import javafx.util.Duration;
 
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.List;
 
 /**
- * Central controller for the Dashboard.
- * Owns all state and provides action methods called by the view.
- * The view observes properties; the controller never touches UI nodes directly.
+ * Central controller for the Dashboard — the single source of truth.
  *
- * ── Merge notes ───────────────────────────────────────────────────────────────
- * Base: Project A (ypt_todo_no_deadline-merged) — authoritative logic source.
- * Added: {@code activePanel} StringProperty (from Project B) so that
- *        DashboardView can observe when to swap between the Timeline section
- *        and the Timetable section.  All timetable sub-panel routing methods
- *        (showTimetableList, showAddClassPane, etc.) and the date-range
- *        filtering in addActiveTimetableClasses() are kept exactly as in A.
+ * ── Architecture change summary ───────────────────────────────────────────────
+ * Previously this class contained hardcoded sample data and LocalTime-based
+ * entry construction.  After the full integration:
+ *
+ *   • Data comes from ScheduleService → JsonScheduleRepository → timeflow-data.json
+ *   • loadEntriesForDay() calls service.getTimelineForDay(date) which handles
+ *     all filtering, date-gating, and timetable expansion automatically.
+ *   • Every mutating action (saveClass, saveNewTimetable, addCalendarEvent…)
+ *     delegates to ScheduleService, which auto-saves to JSON.
+ *   • All TimeEntry subclasses now use LocalDateTime.
+ *
+ * ── Timeline filtering ────────────────────────────────────────────────────────
+ * TimetableExpander (inside ScheduleService) respects each TimetableEntry's
+ * semesterStart/End gate, so classes from past or future semesters never
+ * appear in the Timeline without any additional code in this controller.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 public class DashboardController {
 
+    // ── Services ──────────────────────────────────────────────────────────────
+
+    private final ScheduleService service;
+
     // ── Timeline state ────────────────────────────────────────────────────────
 
-    /** The week whose Sunday starts the week strip. */
-    private final ObjectProperty<LocalDate> weekStart =
+    private final ObjectProperty<LocalDate>  weekStart  =
             new SimpleObjectProperty<>(sundayOf(LocalDate.now()));
-
-    /** The currently selected/highlighted day. */
-    private final ObjectProperty<LocalDate> selectedDay =
+    private final ObjectProperty<LocalDate>  selectedDay =
             new SimpleObjectProperty<>(LocalDate.now());
-
-    /** Whether the sidebar drawer is open. */
-    private final BooleanProperty sidebarOpen = new SimpleBooleanProperty(false);
-
-    /** Whether the FAB speed-dial is expanded. */
-    private final BooleanProperty fabExpanded = new SimpleBooleanProperty(false);
-
-    /** All entries for the currently selected day. */
-    private final ObservableList<TimeEntry> dayEntries =
+    private final BooleanProperty            sidebarOpen = new SimpleBooleanProperty(false);
+    private final BooleanProperty            fabExpanded = new SimpleBooleanProperty(false);
+    private final ObservableList<TimeEntry>  dayEntries  =
             FXCollections.observableArrayList();
 
-    // ── Timetable domain state ────────────────────────────────────────────────
+    // ── Navigation state ──────────────────────────────────────────────────────
 
-    /** All semester timetables created in the UI. */
-    private final ObservableList<TimeTable> timetableList =
+    private final StringProperty activePanel         = new SimpleStringProperty("TIMELINE");
+    private final StringProperty activeTimetablePane = new SimpleStringProperty("MAIN");
+
+    // ── Timetable UI state ────────────────────────────────────────────────────
+
+    private final ObservableList<TimeTable>  timetableList   =
             FXCollections.observableArrayList();
-
-    /** The timetable currently shown in the timetable section. */
-    private final ObjectProperty<TimeTable> activeTimetable =
+    private final ObjectProperty<TimeTable>  activeTimetable =
             new SimpleObjectProperty<>();
-
-    /** Current timetable sub-panel: "MAIN", "ADD", "LIST", or "CREATE". */
-    private final StringProperty activeTimetablePane =
-            new SimpleStringProperty("MAIN");
-
-    // ── Top-level panel routing ───────────────────────────────────────────────
-
-    /**
-     * Which top-level section DashboardView shows.
-     *   "TIMELINE"  → TimelinePane  (default)
-     *   "TIMETABLE" → TimetableMainPane
-     *
-     * DashboardView observes this property and animates the swap.
-     */
-    private final StringProperty activePanel =
-            new SimpleStringProperty("TIMELINE");
-
-    // ── Formatters ────────────────────────────────────────────────────────────
-
-    public static final DateTimeFormatter HEADER_FMT =
-            DateTimeFormatter.ofPattern("EEE, MMM d");
 
     // ── Sidebar animation wiring ──────────────────────────────────────────────
 
@@ -84,28 +68,31 @@ public class DashboardController {
     private Timeline sidebarTimeline;
     private static final double SIDEBAR_WIDTH = 260;
 
+    public static final DateTimeFormatter HEADER_FMT =
+            DateTimeFormatter.ofPattern("EEE, MMM d");
+
     // ── Constructor ───────────────────────────────────────────────────────────
 
     public DashboardController() {
-        seedTimetables();
+        service = new ScheduleService(
+            new JsonScheduleRepository(),
+            new TimetableExpander(),
+            new TimelineBuilder());
+        service.loadData();
+
+        if (service.isEmpty()) seedDemoData();
+
+        loadTimeTables();
         loadEntriesForDay(selectedDay.get());
+
         selectedDay.addListener((obs, o, n) -> loadEntriesForDay(n));
         activeTimetable.addListener((obs, o, n) -> loadEntriesForDay(selectedDay.get()));
     }
 
     // ── Timeline actions ──────────────────────────────────────────────────────
 
-    public void toggleSidebar() {
-        sidebarOpen.set(!sidebarOpen.get());
-        animateSidebar(sidebarOpen.get());
-    }
-
-    public void closeSidebar() {
-        if (sidebarOpen.get()) {
-            sidebarOpen.set(false);
-            animateSidebar(false);
-        }
-    }
+    public void toggleSidebar() { sidebarOpen.set(!sidebarOpen.get()); animateSidebar(sidebarOpen.get()); }
+    public void closeSidebar()  { if (sidebarOpen.get()) { sidebarOpen.set(false); animateSidebar(false); } }
 
     public void backToToday() {
         LocalDate today = LocalDate.now();
@@ -125,106 +112,96 @@ public class DashboardController {
     public void toggleFab()   { fabExpanded.set(!fabExpanded.get()); }
     public void collapseFab() { fabExpanded.set(false); }
 
+    // ── Calendar / ToDo quick-add (from Timeline FAB) ─────────────────────────
+
     public void onAddSchedule() {
         collapseFab();
-        System.out.println("[Action] Open Add Schedule dialog");
+        // TODO: open a "Add Calendar Event" dialog; for now add a sample
+        LocalDate   day   = selectedDay.get();
+        LocalDateTime s   = LocalDateTime.of(day, LocalTime.of(10, 0));
+        LocalDateTime e   = LocalDateTime.of(day, LocalTime.of(11, 0));
+        CalendarEvent ev  = new CalendarEvent(s, e, "New Event", "TBD");
+        service.addCalendarEvent(ev);
+        loadEntriesForDay(day);
+        System.out.println("[Action] Added calendar event for " + day);
     }
 
     public void onAddTodo() {
         collapseFab();
-        System.out.println("[Action] Open Add To-Do dialog");
+        // TODO: open a "Add To-Do" dialog; for now add a sample
+        LocalDate   day = selectedDay.get();
+        LocalDateTime t = LocalDateTime.of(day, LocalTime.of(9, 0));
+        TodoEntry todo  = new TodoEntry(t, "New To-Do");
+        service.addTodoEntry(todo);
+        loadEntriesForDay(day);
+        System.out.println("[Action] Added to-do for " + day);
     }
 
     // ── Navigation ────────────────────────────────────────────────────────────
 
-    /**
-     * Primary navigation — called by SidebarDrawer when the user taps a nav item.
-     *
-     * Sets {@code activePanel} so DashboardView animates the section swap,
-     * then resets the timetable sub-panel to MAIN whenever the user enters
-     * the timetable section.
-     */
     public void navigateTo(String viewName) {
         closeSidebar();
         collapseFab();
         switch (viewName) {
-            case "TimeTable" -> {
-                activePanel.set("TIMETABLE");
-                activeTimetablePane.set("MAIN");
-            }
-            case "TimeLine"  -> activePanel.set("TIMELINE");
-            case "Calendar"  -> {
-                // Calendar section not yet implemented — stay on timeline
-                activePanel.set("TIMELINE");
-                System.out.println("[Navigation] Calendar — not yet implemented");
-            }
-            default -> System.out.println("[Navigation] Unknown view: " + viewName);
+            case "TimeTable" -> { activePanel.set("TIMETABLE"); activeTimetablePane.set("MAIN"); }
+            case "TimeLine"  ->   activePanel.set("TIMELINE");
+            case "Calendar"  -> { activePanel.set("TIMELINE"); System.out.println("[Nav] Calendar not yet built"); }
+            default          ->   System.out.println("[Nav] Unknown: " + viewName);
         }
     }
 
-    // ── Timetable sub-panel routing ───────────────────────────────────────────
-
-    /** FAB "TimeTable" → show Panel 3. */
-    public void showTimetableList() {
-        activeTimetablePane.set("LIST");
-        closeSidebar();
-        collapseFab();
-    }
-
-    /** FAB "Add Class" → show Panel 2. */
-    public void showAddClassPane() {
-        ensureActiveTimetable();
-        activeTimetablePane.set("ADD");
-        closeSidebar();
-        collapseFab();
-    }
-
-    /** Panel 3 mini-FAB → show Panel 4. */
-    public void showCreateTimetable() {
-        activeTimetablePane.set("CREATE");
-        closeSidebar();
-        collapseFab();
-    }
-
-    /** Back arrow in Panel 2, 3 → return to Panel 1. */
-    public void backToTimetableMain() {
-        activeTimetablePane.set("MAIN");
-    }
-
-    /** Back arrow in Panel 4 → return to Panel 3. */
-    public void backToTimetableList() {
-        activeTimetablePane.set("LIST");
-    }
+    public void showAddClassPane()    { activeTimetablePane.set("ADD");    closeSidebar(); collapseFab(); }
+    public void showTimetableList()   { activeTimetablePane.set("LIST");   closeSidebar(); collapseFab(); }
+    public void showCreateTimetable() { activeTimetablePane.set("CREATE"); }
+    public void backToTimetableMain() { activeTimetablePane.set("MAIN"); }
+    public void backToTimetableList() { activeTimetablePane.set("LIST"); }
 
     // ── Timetable domain actions ──────────────────────────────────────────────
 
     /**
-     * Saves a {@link TimetableClassRecord} into the active timetable,
-     * refreshes the day's entry list, and navigates back to Panel 1.
+     * Saves a new course record into the active timetable.
+     *
+     * Converts TimetableClassRecord → List<TimetableEntry> (one per time slot),
+     * persists via ScheduleService, updates the UI TimeTable's class list,
+     * and refreshes the current day's timeline.
      */
     public void saveClass(TimetableClassRecord record) {
         if (record == null) return;
-        ensureActiveTimetable();
-        activeTimetable.get().getClasses().add(record);
+        TimeTable tt = getActiveTimetable();
+        if (tt == null) { System.err.println("[Error] No active timetable"); return; }
+
+        // Convert UI record → persistence entries
+        List<TimetableEntry> entries = record.toTimetableEntries(
+            tt.getStartDate(), tt.getEndDate());
+        service.addTimetableEntries(entries);
+
+        // Keep UI TimeTable in sync
+        tt.getClasses().add(record);
+
         loadEntriesForDay(selectedDay.get());
         backToTimetableMain();
+        System.out.println("[Save] Class: " + record.getSubject() + " → " + tt.getTitle());
     }
 
     /**
-     * Creates a new {@link TimeTable}, appends it to the master list,
-     * makes it active, and navigates back to Panel 3.
+     * Creates a new semester, persists it, and makes it the active timetable.
      */
     public void saveNewTimetable(String title, LocalDate start, LocalDate end) {
-        TimeTable timetable = new TimeTable(title, start, end);
-        timetableList.add(timetable);
-        setActiveTimetable(timetable);
+        SemesterInfo info = new SemesterInfo(title, start, end);
+        service.addSemester(info);
+
+        TimeTable ui = TimeTable.fromSemesterInfo(info);
+        timetableList.add(ui);
+        setActiveTimetable(ui);
+
         backToTimetableList();
+        System.out.println("[Save] TimeTable: " + title + "  " + start + " – " + end);
     }
 
-    /** Changes the active timetable and re-renders the current day. */
-    public void setActiveTimetable(TimeTable timetable) {
-        activeTimetable.set(timetable);
-        // activeTimetable listener fires loadEntriesForDay automatically
+    /** Switches the active timetable and reloads the current day. */
+    public void setActiveTimetable(TimeTable tt) {
+        activeTimetable.set(tt);
+        // listener fires loadEntriesForDay automatically
     }
 
     // ── Sidebar animation ─────────────────────────────────────────────────────
@@ -240,110 +217,81 @@ public class DashboardController {
         double target = open ? 0 : -SIDEBAR_WIDTH;
         sidebarTimeline = new Timeline(
             new KeyFrame(Duration.millis(280),
-                new KeyValue(sidebarPane.translateXProperty(), target,
-                             Interpolator.EASE_BOTH))
-        );
+                new KeyValue(sidebarPane.translateXProperty(), target, Interpolator.EASE_BOTH)));
         sidebarTimeline.play();
     }
 
-    // ── Entry loading (date-range filtered) ───────────────────────────────────
+    // ── Entry loading ─────────────────────────────────────────────────────────
 
+    /**
+     * Delegates entirely to ScheduleService.
+     * Semester date-gating and timetable expansion are handled inside
+     * TimetableExpander — this method has no filtering logic of its own.
+     */
     private void loadEntriesForDay(LocalDate date) {
         dayEntries.clear();
         if (date == null) return;
-        dayEntries.addAll(buildSampleEntries(date));
+        List<TimeEntry> entries = service.getTimelineForDay(date);
+        dayEntries.addAll(entries);
     }
 
-    private List<TimeEntry> buildSampleEntries(LocalDate date) {
-        List<TimeEntry> list = new ArrayList<>();
-        DayOfWeek dow = date.getDayOfWeek();
-
-        // Always: morning to-dos
-        list.add(new TodoEntry(LocalTime.of(8,  0), "Review lecture notes"));
-        list.add(new TodoEntry(LocalTime.of(8, 30), "Reply to group-project emails"));
-
-        // Mon / Wed / Fri — static sample timetable classes (shown when no
-        // active timetable is configured, so the app is demo-able immediately)
-        if (activeTimetable.get() == null &&
-            (dow == DayOfWeek.MONDAY || dow == DayOfWeek.WEDNESDAY || dow == DayOfWeek.FRIDAY)) {
-            list.add(new TimetableClass(
-                LocalTime.of(9, 0), LocalTime.of(10, 30),
-                "Algorithms & Data Structures", "Room 301, Eng. Building", "Prof. Chen Wei"));
-            list.add(new TimetableClass(
-                LocalTime.of(14, 0), LocalTime.of(15, 30),
-                "Linear Algebra", "Room 205, Math Block", "Prof. Sarah Kim"));
-        }
-
-        // Classes from the active timetable — gated by semester date range
-        addActiveTimetableClasses(list, date);
-
-        // Tue / Thu — calendar events
-        if (dow == DayOfWeek.TUESDAY || dow == DayOfWeek.THURSDAY) {
-            list.add(new CalendarEvent(
-                LocalTime.of(10, 0), LocalTime.of(11, 0),
-                "Team Sprint Planning", "Zoom — link in calendar"));
-            list.add(new CalendarEvent(
-                LocalTime.of(15, 0), LocalTime.of(16, 30),
-                "Library Study Session", "Central Library, 3F"));
-        }
-
-        // Every day
-        list.add(new TodoEntry(LocalTime.of(12, 0), "Lunch & short walk"));
-        list.add(new CalendarEvent(
-            LocalTime.of(19, 0), LocalTime.of(20, 0),
-            "Gym — Cardio Day", "University Sports Centre"));
-
-        return list;
-    }
+    // ── TimeTable UI initialisation ───────────────────────────────────────────
 
     /**
-     * Appends TimetableClass entries for today from the active timetable.
-     *
-     * ── Date-range contract ───────────────────────────────────────────────────
-     * Classes are included ONLY when:
-     *   a) A class record has a time slot matching today's DayOfWeek.
-     *   b) today falls within [activeTimetable.startDate, activeTimetable.endDate].
-     * If the semester has ended, its classes silently stop appearing, keeping
-     * the Timeline view accurate without any manual intervention.
+     * Rebuilds the JavaFX timetableList from persisted SemesterInfo + TimetableEntry data.
+     * Called once at startup after service.loadData().
      */
-    private void addActiveTimetableClasses(List<TimeEntry> list, LocalDate date) {
-        TimeTable timetable = activeTimetable.get();
-        if (timetable == null || !timetable.isDateInRange(date)) return;
+    private void loadTimeTables() {
+        timetableList.clear();
+        for (SemesterInfo info : service.getAllSemesters()) {
+            TimeTable ui = TimeTable.fromSemesterInfo(info);
 
-        for (TimetableClassRecord record : timetable.getClasses()) {
-            for (TimetableClassRecord.ClassTimeSlot slot : record.getTimeSlots()) {
-                if (slot.getDayOfWeek() == date.getDayOfWeek()) {
-                    list.add(new TimetableClass(
-                        slot.getStartTime(), slot.getEndTime(),
-                        record.getSubject(), record.getClassroom(), record.getTeacher()
-                    ));
-                }
+            // Re-attach TimetableClassRecord objects for the Timetable panels
+            for (TimetableEntry entry : service.getEntriesForSemester(info)) {
+                ui.getClasses().add(TimetableClassRecord.fromTimetableEntry(entry));
             }
+            timetableList.add(ui);
         }
+
+        // Set first semester as active (or null if none)
+        if (!timetableList.isEmpty()) activeTimetable.set(timetableList.get(0));
     }
 
-    // ── Sample seed data ──────────────────────────────────────────────────────
+    // ── Demo seed data (first launch only) ───────────────────────────────────
 
-    private void seedTimetables() {
-        if (!timetableList.isEmpty()) return;
+    private void seedDemoData() {
+        LocalDate today = LocalDate.now();
 
-        LocalDate semesterStart = LocalDate.now().withDayOfMonth(1);
-        TimeTable current = new TimeTable(
+        // Semester
+        SemesterInfo sem = new SemesterInfo(
             "Current Semester",
-            semesterStart,
-            semesterStart.plusMonths(5).minusDays(1));
+            today.withDayOfMonth(1),
+            today.withDayOfMonth(1).plusMonths(5).minusDays(1));
+        service.addSemester(sem);
 
-        current.getClasses().add(TimetableClassRecord.of(
-            "Algorithms & Data Structures", "Prof. Chen Wei", "Room 301",
-            TimetableClassRecord.AccentColor.PURPLE,
-            DayOfWeek.MONDAY, LocalTime.of(9, 0), LocalTime.of(10, 30)));
-        current.getClasses().add(TimetableClassRecord.of(
-            "Linear Algebra", "Prof. Sarah Kim", "Room 205",
-            TimetableClassRecord.AccentColor.BLUE,
-            DayOfWeek.WEDNESDAY, LocalTime.of(14, 0), LocalTime.of(15, 30)));
+        // Two recurring classes
+        service.addTimetableEntries(List.of(
+            new TimetableEntry("Algorithms & Data Structures",
+                DayOfWeek.MONDAY, LocalTime.of(9,0), LocalTime.of(10,30),
+                "Room 301", "Prof. Chen Wei", "PURPLE", null,
+                sem.getStartDate(), sem.getEndDate()),
+            new TimetableEntry("Linear Algebra",
+                DayOfWeek.WEDNESDAY, LocalTime.of(14,0), LocalTime.of(15,30),
+                "Room 205", "Prof. Sarah Kim", "BLUE", null,
+                sem.getStartDate(), sem.getEndDate())
+        ));
 
-        timetableList.add(current);
-        activeTimetable.set(current);
+        // A calendar event today
+        service.addCalendarEvent(new CalendarEvent(
+            LocalDateTime.of(today, LocalTime.of(13,0)),
+            LocalDateTime.of(today, LocalTime.of(14,0)),
+            "Team Sprint Planning", "Zoom"));
+
+        // A to-do today
+        service.addTodoEntry(new TodoEntry(
+            LocalDateTime.of(today, LocalTime.of(8,0)), "Review lecture notes"));
+
+        System.out.println("[Seed] Demo data written to JSON.");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -352,26 +300,21 @@ public class DashboardController {
         return date.minusDays(date.getDayOfWeek().getValue() % 7);
     }
 
-    private void ensureActiveTimetable() {
-        if (activeTimetable.get() == null) seedTimetables();
-    }
-
     // ── Property accessors ────────────────────────────────────────────────────
 
-    public ObjectProperty<LocalDate>    weekStartProperty()          { return weekStart; }
-    public ObjectProperty<LocalDate>    selectedDayProperty()        { return selectedDay; }
-    public BooleanProperty              sidebarOpenProperty()        { return sidebarOpen; }
-    public BooleanProperty              fabExpandedProperty()        { return fabExpanded; }
-    public ObservableList<TimeEntry>    getDayEntries()              { return dayEntries; }
-    public ObservableList<TimeTable>    getTimetableList()           { return timetableList; }
-    public ObjectProperty<TimeTable>    activeTimetableProperty()    { return activeTimetable; }
-    public StringProperty               activeTimetablePaneProperty(){ return activeTimetablePane; }
-    public StringProperty               activePanelProperty()        { return activePanel; }
+    public ObjectProperty<LocalDate>   weekStartProperty()          { return weekStart; }
+    public ObjectProperty<LocalDate>   selectedDayProperty()        { return selectedDay; }
+    public BooleanProperty             sidebarOpenProperty()        { return sidebarOpen; }
+    public BooleanProperty             fabExpandedProperty()        { return fabExpanded; }
+    public StringProperty              activePanelProperty()        { return activePanel; }
+    public StringProperty              activeTimetablePaneProperty(){ return activeTimetablePane; }
+    public ObjectProperty<TimeTable>   activeTimetableProperty()    { return activeTimetable; }
+    public ObservableList<TimeEntry>   getDayEntries()              { return dayEntries; }
+    public ObservableList<TimeTable>   getTimetableList()           { return timetableList; }
 
-    public LocalDate  getWeekStart()         { return weekStart.get(); }
-    public LocalDate  getSelectedDay()       { return selectedDay.get(); }
-    public boolean    isSidebarOpen()        { return sidebarOpen.get(); }
-    public boolean    isFabExpanded()        { return fabExpanded.get(); }
-    public TimeTable  getActiveTimetable()   { return activeTimetable.get(); }
-    public String     getActivePanel()       { return activePanel.get(); }
+    public LocalDate  getWeekStart()        { return weekStart.get(); }
+    public LocalDate  getSelectedDay()      { return selectedDay.get(); }
+    public boolean    isSidebarOpen()       { return sidebarOpen.get(); }
+    public String     getActivePanel()      { return activePanel.get(); }
+    public TimeTable  getActiveTimetable()  { return activeTimetable.get(); }
 }
