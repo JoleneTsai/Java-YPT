@@ -1,5 +1,12 @@
 package com.timeapp.controller;
 
+import com.timeapp.domain.model.ScheduleData;
+import com.timeapp.domain.model.TimetableData;
+import com.timeapp.domain.model.TimetableEntry;
+import com.timeapp.domain.repository.JsonScheduleRepository;
+import com.timeapp.domain.service.ScheduleService;
+import com.timeapp.domain.service.TimelineBuilder;
+import com.timeapp.domain.service.TimetableExpander;
 import com.timeapp.model.*;
 import javafx.animation.*;
 import javafx.beans.property.*;
@@ -26,6 +33,8 @@ import java.util.*;
  * ─────────────────────────────────────────────────────────────────────────────
  */
 public class DashboardController {
+
+    private static final String DATA_FILE_PATH = "schedule-data.json";
 
     // ── Timeline state ────────────────────────────────────────────────────────
 
@@ -84,10 +93,22 @@ public class DashboardController {
     private Timeline sidebarTimeline;
     private static final double SIDEBAR_WIDTH = 260;
 
+    // ── Persistence wiring ───────────────────────────────────────────────────
+
+    private final ScheduleService scheduleService;
+    private final Map<String, String> persistedTimetableIdsByUiId = new HashMap<>();
+
     // ── Constructor ───────────────────────────────────────────────────────────
 
     public DashboardController() {
-        seedTimetables();
+        scheduleService = new ScheduleService(
+            new JsonScheduleRepository(DATA_FILE_PATH),
+            new TimetableExpander(),
+            new TimelineBuilder()
+        );
+        scheduleService.loadData();
+        loadPersistedTimetables();
+        if (timetableList.isEmpty()) seedTimetables();
         loadEntriesForDay(selectedDay.get());
         selectedDay.addListener((obs, o, n) -> loadEntriesForDay(n));
         activeTimetable.addListener((obs, o, n) -> loadEntriesForDay(selectedDay.get()));
@@ -206,6 +227,7 @@ public class DashboardController {
         if (record == null) return;
         ensureActiveTimetable();
         activeTimetable.get().getClasses().add(record);
+        persistClassRecord(record, activeTimetable.get());
         loadEntriesForDay(selectedDay.get());
         backToTimetableMain();
     }
@@ -218,6 +240,7 @@ public class DashboardController {
         TimeTable timetable = new TimeTable(title, start, end);
         timetableList.add(timetable);
         setActiveTimetable(timetable);
+        persistTimetable(timetable);
         backToTimetableList();
     }
 
@@ -344,6 +367,199 @@ public class DashboardController {
 
         timetableList.add(current);
         activeTimetable.set(current);
+    }
+
+    private void loadPersistedTimetables() {
+        ScheduleData data = scheduleService.getData();
+        if (data == null) {
+            return;
+        }
+
+        if (data.getTimetables() != null && !data.getTimetables().isEmpty()) {
+            loadTimetableData(data.getTimetables());
+            return;
+        }
+
+        loadLegacyTimetableEntries(data.getTimetableEntries());
+    }
+
+    private void loadTimetableData(List<TimetableData> timetables) {
+        for (TimetableData saved : timetables) {
+            if (saved == null) continue;
+
+            LocalDate start = saved.getStartDate() != null
+                ? saved.getStartDate()
+                : LocalDate.now().withDayOfMonth(1);
+            LocalDate end = saved.getEndDate() != null
+                ? saved.getEndDate()
+                : start.plusMonths(5).minusDays(1);
+
+            TimeTable timetable = new TimeTable(nullToDefault(saved.getTitle(), "Saved Timetable"), start, end);
+            timetableList.add(timetable);
+            persistedTimetableIdsByUiId.put(timetable.getId(), saved.getId());
+
+            if (saved.getClasses() == null) continue;
+            for (TimetableEntry entry : saved.getClasses()) {
+                TimetableClassRecord record = toUiClassRecord(entry);
+                if (record != null) {
+                    timetable.getClasses().add(record);
+                }
+            }
+        }
+
+        if (!timetableList.isEmpty()) {
+            activeTimetable.set(timetableList.get(0));
+        }
+    }
+
+    private void loadLegacyTimetableEntries(List<TimetableEntry> entries) {
+        if (entries == null || entries.isEmpty()) {
+            return;
+        }
+
+        Map<String, TimeTable> timetablesByRange = new LinkedHashMap<>();
+        Map<String, TimetableClassRecord> recordsByClass = new LinkedHashMap<>();
+        boolean migratedLegacyEntries = false;
+
+        for (TimetableEntry entry : entries) {
+            if (entry == null || entry.getDayOfWeek() == null
+                || entry.getStartTime() == null || entry.getEndTime() == null) {
+                continue;
+            }
+
+            LocalDate start = entry.getSemesterStart() != null
+                ? entry.getSemesterStart()
+                : LocalDate.now().withDayOfMonth(1);
+            LocalDate end = entry.getSemesterEnd() != null
+                ? entry.getSemesterEnd()
+                : start.plusMonths(5).minusDays(1);
+
+            String rangeKey = start + "|" + end;
+            TimeTable timetable = timetablesByRange.computeIfAbsent(rangeKey, key -> {
+                TimeTable created = new TimeTable("Saved Timetable", start, end);
+                timetableList.add(created);
+                persistTimetable(created);
+                return created;
+            });
+
+            String classKey = rangeKey + "|"
+                + nullToEmpty(entry.getTitle()) + "|"
+                + nullToEmpty(entry.getTeacher()) + "|"
+                + nullToEmpty(entry.getRoom()) + "|"
+                + nullToEmpty(entry.getColor());
+
+            TimetableClassRecord record = recordsByClass.computeIfAbsent(classKey, key -> {
+                TimetableClassRecord created = new TimetableClassRecord(
+                    nullToEmpty(entry.getTitle()),
+                    nullToEmpty(entry.getTeacher()),
+                    nullToEmpty(entry.getRoom()),
+                    accentColorFromHex(entry.getColor())
+                );
+                timetable.getClasses().add(created);
+                return created;
+            });
+
+            record.addTimeSlot(new TimetableClassRecord.ClassTimeSlot(
+                entry.getDayOfWeek(),
+                entry.getStartTime(),
+                entry.getEndTime()
+            ));
+            scheduleService.addClassToTimetable(ensurePersistedTimetable(timetable), entry);
+            migratedLegacyEntries = true;
+        }
+
+        if (migratedLegacyEntries) {
+            scheduleService.getData().getTimetableEntries().clear();
+            scheduleService.saveData();
+        }
+
+        if (!timetableList.isEmpty()) {
+            activeTimetable.set(timetableList.get(0));
+        }
+    }
+
+    private void persistClassRecord(TimetableClassRecord record, TimeTable timetable) {
+        String timetableId = ensurePersistedTimetable(timetable);
+
+        for (TimetableClassRecord.ClassTimeSlot slot : record.getTimeSlots()) {
+            if (slot == null || slot.getDayOfWeek() == null
+                || slot.getStartTime() == null || slot.getEndTime() == null) {
+                continue;
+            }
+
+            scheduleService.addClassToTimetable(timetableId, new TimetableEntry(
+                record.getSubject(),
+                slot.getDayOfWeek(),
+                slot.getStartTime(),
+                slot.getEndTime(),
+                record.getClassroom(),
+                record.getTeacher(),
+                record.getAccentColor() != null ? record.getAccentColor().strip : null,
+                "課程",
+                timetable.getStartDate(),
+                timetable.getEndDate()
+            ));
+        }
+    }
+
+    private void persistTimetable(TimeTable timetable) {
+        if (timetable == null || persistedTimetableIdsByUiId.containsKey(timetable.getId())) {
+            return;
+        }
+
+        TimetableData data = new TimetableData(
+            timetable.getId(),
+            timetable.getTitle(),
+            timetable.getStartDate(),
+            timetable.getEndDate(),
+            new ArrayList<>()
+        );
+        scheduleService.addTimetable(data);
+        persistedTimetableIdsByUiId.put(timetable.getId(), data.getId());
+    }
+
+    private String ensurePersistedTimetable(TimeTable timetable) {
+        persistTimetable(timetable);
+        return persistedTimetableIdsByUiId.get(timetable.getId());
+    }
+
+    private TimetableClassRecord toUiClassRecord(TimetableEntry entry) {
+        if (entry == null || entry.getDayOfWeek() == null
+            || entry.getStartTime() == null || entry.getEndTime() == null) {
+            return null;
+        }
+
+        TimetableClassRecord record = new TimetableClassRecord(
+            nullToEmpty(entry.getTitle()),
+            nullToEmpty(entry.getTeacher()),
+            nullToEmpty(entry.getRoom()),
+            accentColorFromHex(entry.getColor())
+        );
+        record.addTimeSlot(new TimetableClassRecord.ClassTimeSlot(
+            entry.getDayOfWeek(),
+            entry.getStartTime(),
+            entry.getEndTime()
+        ));
+        return record;
+    }
+
+    private TimetableClassRecord.AccentColor accentColorFromHex(String hex) {
+        if (hex != null) {
+            for (TimetableClassRecord.AccentColor color : TimetableClassRecord.AccentColor.values()) {
+                if (hex.equalsIgnoreCase(color.strip)) {
+                    return color;
+                }
+            }
+        }
+        return TimetableClassRecord.AccentColor.PURPLE;
+    }
+
+    private String nullToEmpty(String value) {
+        return value == null ? "" : value;
+    }
+
+    private String nullToDefault(String value, String fallback) {
+        return value == null || value.isBlank() ? fallback : value;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

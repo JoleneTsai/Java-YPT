@@ -4,6 +4,7 @@ import com.timeapp.domain.model.CalendarEvent;
 import com.timeapp.domain.model.ExpandedTimetableEvent;
 import com.timeapp.domain.model.Schedulable;
 import com.timeapp.domain.model.ScheduleData;
+import com.timeapp.domain.model.TimetableData;
 import com.timeapp.domain.model.TimetableEntry;
 import com.timeapp.domain.model.ToDoTask;
 import com.timeapp.domain.repository.ScheduleRepository;
@@ -12,6 +13,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -82,6 +84,21 @@ public class ScheduleService {
         saveData();
     }
 
+    public void addTimetable(TimetableData timetable) {
+        Objects.requireNonNull(timetable, "timetable must not be null");
+        data.getTimetables().add(timetable);
+        saveData();
+    }
+
+    public void addClassToTimetable(String timetableId, TimetableEntry entry) {
+        Objects.requireNonNull(timetableId, "timetableId must not be null");
+        Objects.requireNonNull(entry, "entry must not be null");
+        TimetableData timetable = findTimetable(timetableId)
+            .orElseThrow(() -> new IllegalArgumentException("Unknown timetable id: " + timetableId));
+        timetable.getClasses().add(entry);
+        saveData();
+    }
+
     // ── To-do tasks ───────────────────────────────────────────────────────────
 
     public void addToDoTask(ToDoTask task) {
@@ -120,7 +137,7 @@ public class ScheduleService {
 
         List<CalendarEvent>          calEvents = calendarEventsInRange(from, to);
         List<ExpandedTimetableEvent> expanded  =
-            timetableExpander.expand(data.getTimetableEntries(), from, to);
+            timetableExpander.expand(allTimetableEntries(), from, to);
 
         return timelineBuilder.buildTimeline(calEvents, expanded);
     }
@@ -145,12 +162,41 @@ public class ScheduleService {
             .collect(Collectors.toList());
     }
 
+    private Optional<TimetableData> findTimetable(String timetableId) {
+        return data.getTimetables().stream()
+            .filter(Objects::nonNull)
+            .filter(timetable -> timetableId.equals(timetable.getId()))
+            .findFirst();
+    }
+
+    private List<TimetableEntry> allTimetableEntries() {
+        List<TimetableEntry> entries = new ArrayList<>();
+
+        for (TimetableData timetable : data.getTimetables()) {
+            if (timetable != null && timetable.getClasses() != null) {
+                entries.addAll(timetable.getClasses());
+            }
+        }
+
+        if (entries.isEmpty()) {
+            entries.addAll(data.getTimetableEntries());
+        }
+
+        return entries;
+    }
+
     /** Ensures no list inside ScheduleData is null (guards against bad JSON). */
     private ScheduleData normalise(ScheduleData loaded) {
         ScheduleData d = loaded != null ? loaded : new ScheduleData();
         if (d.getCalendarEvents()   == null) d.setCalendarEvents(new ArrayList<>());
         if (d.getTodoTasks()        == null) d.setTodoTasks(new ArrayList<>());
         if (d.getTimetableEntries() == null) d.setTimetableEntries(new ArrayList<>());
+        if (d.getTimetables()       == null) d.setTimetables(new ArrayList<>());
+        for (TimetableData timetable : d.getTimetables()) {
+            if (timetable != null && timetable.getClasses() == null) {
+                timetable.setClasses(new ArrayList<>());
+            }
+        }
         return d;
     }
 }
