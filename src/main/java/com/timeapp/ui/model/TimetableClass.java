@@ -1,4 +1,4 @@
-package com.timeapp.model;
+package com.timeapp.ui.model;
 
 import java.time.LocalTime;
 

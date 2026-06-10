@@ -856,3 +856,103 @@
     -fx-max-height: 48px;
     -fx-background-radius: 24;
 }
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   CALENDAR MODULE STYLES
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.calendar-month-label {
+    -fx-font-size: 17px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #111111;
+    -fx-alignment: center;
+}
+
+.calendar-week-header {
+    -fx-background-color: #FAFAFA;
+    -fx-padding: 6 0 6 0;
+    -fx-border-color: transparent transparent #E5E5EA transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.calendar-week-header-label {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #8E8E93;
+}
+
+.calendar-grid {
+    -fx-background-color: #FFFFFF;
+}
+
+.calendar-day-cell {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #F0F0F5;
+    -fx-border-width: 0 0 1 0;
+}
+
+.calendar-day-cell-hover {
+    -fx-background-color: #F8F8FC;
+}
+
+.calendar-day-num {
+    -fx-font-size: 14px;
+    -fx-text-fill: #222222;
+    -fx-font-weight: normal;
+}
+
+.calendar-overflow-day-num {
+    -fx-font-size: 14px;
+    -fx-text-fill: #222222;
+    -fx-font-weight: normal;
+}
+
+/* today circle reuses day-circle-today (#ee5e56) from WeekStripBar */
+
+.calendar-event-dot {
+    -fx-fill: #4A9EFF;
+    -fx-effect: dropshadow(gaussian, rgba(74,158,255,0.4), 4, 0, 0, 0);
+}
+
+/* Day schedule view */
+.calendar-day-event-row {
+    -fx-background-color: #FFFFFF;
+    -fx-cursor: hand;
+}
+
+.calendar-day-event-row-hover {
+    -fx-background-color: #F8F8FC;
+}
+
+.calendar-day-event-time {
+    -fx-font-size: 13px;
+    -fx-text-fill: #8E8E93;
+    -fx-alignment: center-right;
+}
+
+.calendar-day-event-line {
+    -fx-fill: #4A9EFF;
+}
+
+.calendar-day-event-title {
+    -fx-font-size: 15px;
+    -fx-text-fill: #111111;
+}
+
+.calendar-day-event-location {
+    -fx-font-size: 12px;
+    -fx-text-fill: #8E8E93;
+}
+
+.calendar-day-empty {
+    -fx-font-size: 14px;
+    -fx-text-fill: #C7C7CC;
+    -fx-alignment: center;
+}
+
+/* Icon color inside event cards */
+.card-icon {
+    -fx-text-fill: #8E8E93;
+    -fx-font-size: 10px;
+}

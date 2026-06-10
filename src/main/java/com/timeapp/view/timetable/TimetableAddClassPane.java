@@ -1,9 +1,9 @@
 package com.timeapp.view.timetable;
 
 import com.timeapp.controller.DashboardController;
-import com.timeapp.model.TimetableClassRecord;
-import com.timeapp.model.TimetableClassRecord.AccentColor;
-import com.timeapp.model.TimetableClassRecord.ClassTimeSlot;
+import com.timeapp.ui.model.TimetableClassRecord;
+import com.timeapp.ui.model.TimetableClassRecord.AccentColor;
+import com.timeapp.ui.model.TimetableClassRecord.ClassTimeSlot;
 import com.timeapp.view.IconLabel;
 import javafx.geometry.*;
 import javafx.scene.control.*;
@@ -16,25 +16,25 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Panel 2 — Add Class Screen.
+ * Panel 2 ??Add Class Screen.
  *
- * Triggered from Panel 1's FAB → "Add Class".
+ * Triggered from Panel 1's FAB ??"Add Class".
  *
  * Form fields:
  *   Subject, Teacher, Color (circle picker), Class Time (dynamic rows), Classroom
  *
  * Save flow:
- *   Validates → builds TimetableClassRecord → calls ctrl.saveClass(record).
+ *   Validates ??builds TimetableClassRecord ??calls ctrl.saveClass(record).
  *   Controller appends to the active timetable, refreshes the timeline,
  *   and fires activeTimetablePane back to "MAIN".
  *
- * ── Required fixes applied ────────────────────────────────────────────────────
- * 1. import java.time.format.DateTimeFormatter  — wildcard java.time.* does NOT
+ * ?? Required fixes applied ????????????????????????????????????????????????????
+ * 1. import java.time.format.DateTimeFormatter  ??wildcard java.time.* does NOT
  *    cover sub-packages; the inner class TimeSlotRow needs this explicitly.
- * 2. private HBox node = null  — initialise the field to null so the compiler
+ * 2. private HBox node = null  ??initialise the field to null so the compiler
  *    can confirm it is assigned before use without reporting
  *    "variable might not have been initialized".
- * ─────────────────────────────────────────────────────────────────────────────
+ * ?????????????????????????????????????????????????????????????????????????????
  */
 public class TimetableAddClassPane extends VBox {
 
@@ -59,7 +59,7 @@ public class TimetableAddClassPane extends VBox {
         addTimeSlotRow();   // start with one default row
     }
 
-    // ── Header ────────────────────────────────────────────────────────────────
+    // ?? Header ????????????????????????????????????????????????????????????????
 
     private HBox buildHeader() {
         HBox bar = new HBox(12);
@@ -92,7 +92,7 @@ public class TimetableAddClassPane extends VBox {
         return bar;
     }
 
-    // ── Form ─────────────────────────────────────────────────────────────────
+    // ?? Form ?????????????????????????????????????????????????????????????????
 
     private ScrollPane buildForm() {
         VBox form = new VBox(0);
@@ -121,7 +121,7 @@ public class TimetableAddClassPane extends VBox {
         return sp;
     }
 
-    // ── Form helpers ──────────────────────────────────────────────────────────
+    // ?? Form helpers ??????????????????????????????????????????????????????????
 
     private HBox formRow(String label, TextField field) {
         Label lbl = new Label(label);
@@ -151,7 +151,7 @@ public class TimetableAddClassPane extends VBox {
         return tf;
     }
 
-    // ── Color picker row ──────────────────────────────────────────────────────
+    // ?? Color picker row ??????????????????????????????????????????????????????
 
     private HBox buildColorRow() {
         Label lbl = new Label("Color");
@@ -195,7 +195,7 @@ public class TimetableAddClassPane extends VBox {
         return row;
     }
 
-    // ── Class time section ────────────────────────────────────────────────────
+    // ?? Class time section ????????????????????????????????????????????????????
 
     private VBox buildClassTimeSection() {
         Label lbl = new Label("Class Time");
@@ -217,7 +217,7 @@ public class TimetableAddClassPane extends VBox {
         timeSlotsBox.getChildren().add(row.getNode());
     }
 
-    // ── Save ─────────────────────────────────────────────────────────────────
+    // ?? Save ?????????????????????????????????????????????????????????????????
 
     private void onSave() {
         String subject   = subjectField.getText().trim();
@@ -238,6 +238,14 @@ public class TimetableAddClassPane extends VBox {
             ClassTimeSlot slot = row.buildSlot();
             if (slot != null) rec.addTimeSlot(slot);
         }
+        if (rec.getTimeSlots().isEmpty()) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Invalid Class Time");
+            alert.setHeaderText("Please add at least one valid class time.");
+            alert.setContentText("End time must be after start time.");
+            alert.showAndWait();
+            return;
+        }
 
         ctrl.saveClass(rec);
         resetForm();
@@ -253,8 +261,8 @@ public class TimetableAddClassPane extends VBox {
         addTimeSlotRow();
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
-    // Inner class — one time-slot row  (Day + Start + End + remove)
+    // ????????????????????????????????????????????????????????????????????????????
+    // Inner class ??one time-slot row  (Day + Start + End + remove)
     //
     // FIX: `private HBox node = null;`
     //   The field is explicitly initialised to null so javac can verify it is
@@ -262,7 +270,7 @@ public class TimetableAddClassPane extends VBox {
     //   Without the `= null` initialiser the compiler may report
     //   "variable node might not have been initialized" if it analyses a code
     //   path where the constructor throws before the assignment.
-    // ═══════════════════════════════════════════════════════════════════════════
+    // ????????????????????????????????????????????????????????????????????????????
 
     private class TimeSlotRow {
 
@@ -281,7 +289,7 @@ public class TimetableAddClassPane extends VBox {
             startBox.setValue(LocalTime.of(9, 0));
             endBox.setValue(LocalTime.of(10, 30));
 
-            Label dash = new Label("–");
+            Label dash = new Label("-");
             dash.getStyleClass().add("tt-form-label");
 
             Label xIcon = IconLabel.of(IconLabel.XMARK, 12, "tt-remove-icon");

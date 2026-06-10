@@ -85,6 +85,15 @@ public final class IconLabel {
     /** ‹  chevron-left — back navigation */
     public static final String CHEVRON_LEFT   = "\uf053";
 
+    /** >  chevron-right -- calendar next month */
+    public static final String CHEVRON_RIGHT  = "\uf054";
+
+    /** pin  map-marker -- location in event cards (replaces broken emoji) */
+    public static final String MAP_MARKER     = "\uf041";
+
+    /** person  user -- professor in timetable cards (replaces broken emoji) */
+    public static final String USER           = "\uf007";
+
     /** ✓  check — save / confirm */
     public static final String CHECK          = "\uf00c";
 

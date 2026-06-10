@@ -1,9 +1,10 @@
 package com.timeapp.view.timetable;
 
 import com.timeapp.controller.DashboardController;
-import com.timeapp.model.*;
+import com.timeapp.ui.model.*;
 import com.timeapp.view.IconLabel;
 import javafx.animation.*;
+import javafx.collections.ListChangeListener;
 import javafx.geometry.*;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -15,7 +16,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 
 /**
- * Panel 1 — Timetable Main View.
+ * Panel 1 ??Timetable Main View.
  *
  * Acts as the sub-navigation hub for the timetable section.
  * Owns an internal StackPane that holds all three sub-panels (Panels 2/3/4)
@@ -24,11 +25,11 @@ import java.util.Locale;
  * Sub-panels start off-screen (translateX = +W) and are animated into view.
  * When returning to MAIN they slide back out and are hidden.
  *
- * ── Forward-reference fix ─────────────────────────────────────────────────────
+ * ?? Forward-reference fix ?????????????????????????????????????????????????????
  * In buildTimetableFab(), both mini-buttons are declared BEFORE their lambda
  * actions are wired, eliminating the "cannot find symbol" compile error that
  * occurs when a lambda captures a local variable not yet in scope.
- * ─────────────────────────────────────────────────────────────────────────────
+ * ?????????????????????????????????????????????????????????????????????????????
  */
 public class TimetableMainPane extends AnchorPane {
 
@@ -44,18 +45,19 @@ public class TimetableMainPane extends AnchorPane {
     private final TimetableListPane     listPane;
     private final TimetableCreatePane   createPane;
 
-    // Today's day-of-week index (Sun = 0, Mon = 1, … Sat = 6)
+    // Today's day-of-week index (Sun = 0, Mon = 1, ??Sat = 6)
     private final int activeDayIndex = LocalDate.now().getDayOfWeek().getValue() % 7;
 
     // FAB state
     private final Button[] mainFabRef  = new Button[1];
     private boolean         ttFabExpanded = false;
+    private ListChangeListener<TimetableClassRecord> activeClassListListener;
 
     public TimetableMainPane(DashboardController ctrl) {
         this.ctrl = ctrl;
         getStyleClass().add("page");
 
-        // ── Base content (always visible) ─────────────────────────────────────
+        // ?? Base content (always visible) ?????????????????????????????????????
         BorderPane mainContent = buildMainContent();
         AnchorPane.setTopAnchor(mainContent,    0.0);
         AnchorPane.setBottomAnchor(mainContent, 0.0);
@@ -63,7 +65,7 @@ public class TimetableMainPane extends AnchorPane {
         AnchorPane.setRightAnchor(mainContent,  0.0);
         getChildren().add(mainContent);
 
-        // ── Sub-panels ────────────────────────────────────────────────────────
+        // ?? Sub-panels ????????????????????????????????????????????????????????
         addClassPane = new TimetableAddClassPane(ctrl);
         listPane     = new TimetableListPane(ctrl);
         createPane   = new TimetableCreatePane(ctrl);
@@ -85,20 +87,20 @@ public class TimetableMainPane extends AnchorPane {
         AnchorPane.setRightAnchor(subStack,  0.0);
         getChildren().add(subStack);
 
-        // ── FAB ───────────────────────────────────────────────────────────────
+        // ?? FAB ???????????????????????????????????????????????????????????????
         VBox fabNode = buildTimetableFab();
         AnchorPane.setRightAnchor(fabNode,  20.0);
         AnchorPane.setBottomAnchor(fabNode, 36.0);
         getChildren().add(fabNode);
 
-        // ── Sub-panel routing ─────────────────────────────────────────────────
+        // ?? Sub-panel routing ?????????????????????????????????????????????????
         ctrl.activeTimetablePaneProperty().addListener((obs, from, to) ->
             slideToPane(from, to));
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
+    // ????????????????????????????????????????????????????????????????????????????
     // Main content (top bar + week header + schedule grid)
-    // ═══════════════════════════════════════════════════════════════════════════
+    // ????????????????????????????????????????????????????????????????????????????
 
     private BorderPane buildMainContent() {
         BorderPane bp = new BorderPane();
@@ -107,7 +109,7 @@ public class TimetableMainPane extends AnchorPane {
         return bp;
     }
 
-    // ── Top bar ───────────────────────────────────────────────────────────────
+    // ?? Top bar ???????????????????????????????????????????????????????????????
 
     private VBox buildTopSection() {
         VBox top = new VBox();
@@ -143,7 +145,7 @@ public class TimetableMainPane extends AnchorPane {
         return top;
     }
 
-    // ── Week header (SUN MON … SAT) ───────────────────────────────────────────
+    // ?? Week header (SUN MON ??SAT) ???????????????????????????????????????????
 
     private HBox buildWeekHeader() {
         HBox strip = new HBox(0);
@@ -152,7 +154,7 @@ public class TimetableMainPane extends AnchorPane {
 
         String[] days = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
 
-        // Left gutter spacer — same width as the time-label column in the grid
+        // Left gutter spacer ??same width as the time-label column in the grid
         Region gutter = new Region();
         gutter.setPrefWidth(56);
         gutter.setMinWidth(56);
@@ -170,7 +172,7 @@ public class TimetableMainPane extends AnchorPane {
         return strip;
     }
 
-    // ── Schedule grid ─────────────────────────────────────────────────────────
+    // ?? Schedule grid ?????????????????????????????????????????????????????????
 
     private ScrollPane buildScheduleGrid() {
         final int    START_H = 7;
@@ -214,20 +216,7 @@ public class TimetableMainPane extends AnchorPane {
         // Initial card render
         renderClassCards(canvas, START_H, ROW_H, COL_W);
 
-        // Re-render when the class list of the current timetable changes
-        TimeTable tt = ctrl.getActiveTimetable();
-        if (tt != null) {
-            tt.getClasses().addListener(
-                (javafx.collections.ListChangeListener<TimetableClassRecord>) c -> {
-                    canvas.getChildren().removeIf(n -> Boolean.TRUE.equals(n.getUserData()));
-                    renderClassCards(canvas, START_H, ROW_H, COL_W);
-                });
-        }
-        // Re-render when the active timetable itself is replaced
-        ctrl.activeTimetableProperty().addListener((obs, o, newTt) -> {
-            canvas.getChildren().removeIf(n -> Boolean.TRUE.equals(n.getUserData()));
-            if (newTt != null) renderClassCards(canvas, START_H, ROW_H, COL_W);
-        });
+        bindClassListRenderer(canvas, START_H, ROW_H, COL_W);
 
         ScrollPane sp = new ScrollPane(canvas);
         sp.setFitToWidth(true);
@@ -236,6 +225,31 @@ public class TimetableMainPane extends AnchorPane {
         sp.getStyleClass().add("timeline-scroll");
         sp.setVvalue(0.1);
         return sp;
+    }
+
+    private void bindClassListRenderer(AnchorPane canvas, int startH,
+                                       double rowH, double colW) {
+        Runnable render = () -> {
+            canvas.getChildren().removeIf(n -> Boolean.TRUE.equals(n.getUserData()));
+            renderClassCards(canvas, startH, rowH, colW);
+        };
+
+        activeClassListListener = change -> render.run();
+        TimeTable current = ctrl.getActiveTimetable();
+        if (current != null) {
+            current.getClasses().addListener(activeClassListListener);
+        }
+
+        ctrl.activeTimetableProperty().addListener((obs, oldTt, newTt) -> {
+            if (oldTt != null && activeClassListListener != null) {
+                oldTt.getClasses().removeListener(activeClassListListener);
+            }
+            activeClassListListener = change -> render.run();
+            if (newTt != null) {
+                newTt.getClasses().addListener(activeClassListListener);
+            }
+            render.run();
+        });
     }
 
     private void renderClassCards(AnchorPane canvas, int startH,
@@ -257,11 +271,29 @@ public class TimetableMainPane extends AnchorPane {
 
                 VBox card = buildGridCard(rec, color, colW - 4, h);
                 card.setUserData(Boolean.TRUE);   // marker for removal on re-render
+                attachClassMenu(card, rec);
                 AnchorPane.setTopAnchor(card,  y);
                 AnchorPane.setLeftAnchor(card, x);
                 canvas.getChildren().add(card);
             }
         }
+    }
+
+    private void attachClassMenu(VBox card, TimetableClassRecord record) {
+        MenuItem editItem = new MenuItem("Edit Class");
+        editItem.setOnAction(e -> ctrl.editClass(record));
+        MenuItem deleteItem = new MenuItem("Delete Class");
+        deleteItem.setOnAction(e -> ctrl.deleteClass(record));
+        ContextMenu menu = new ContextMenu(editItem, deleteItem);
+
+        card.setOnMouseClicked(e -> {
+            menu.show(card, e.getScreenX(), e.getScreenY());
+            e.consume();
+        });
+        card.setOnContextMenuRequested(e -> {
+            menu.show(card, e.getScreenX(), e.getScreenY());
+            e.consume();
+        });
     }
 
     private VBox buildGridCard(TimetableClassRecord rec,
@@ -292,17 +324,17 @@ public class TimetableMainPane extends AnchorPane {
         return card;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
+    // ????????????????????????????????????????????????????????????????????????????
     // Timetable FAB  (speed-dial: "TimeTable" + "Add Class")
     //
     // KEY FIX: both mini-buttons (btnTimeTable, btnAddClass) are declared
     // BEFORE their setOnAction lambdas so both variables are in scope for
     // both lambdas.  Declaring one after the other's lambda references it
     // causes a Java compile-time "cannot find symbol" error.
-    // ═══════════════════════════════════════════════════════════════════════════
+    // ????????????????????????????????????????????????????????????????????????????
 
     private VBox buildTimetableFab() {
-        // ── Declare BOTH buttons first ────────────────────────────────────────
+        // ?? Declare BOTH buttons first ????????????????????????????????????????
         Button btnTimeTable = ttMiniFab(IconLabel.CALENDAR, "TimeTable");
         Button btnAddClass  = ttMiniFab(IconLabel.PLUS,     "Add Class");
 
@@ -311,7 +343,7 @@ public class TimetableMainPane extends AnchorPane {
         btnAddClass.setVisible(false);
         btnAddClass.setManaged(false);
 
-        // ── Wire actions (both variables now in scope for both lambdas) ───────
+        // ?? Wire actions (both variables now in scope for both lambdas) ???????
         btnTimeTable.setOnAction(e -> {
             collapseTtFab(btnTimeTable, btnAddClass, mainFabRef[0]);
             ctrl.showTimetableList();
@@ -321,7 +353,7 @@ public class TimetableMainPane extends AnchorPane {
             ctrl.showAddClassPane();
         });
 
-        // ── Main FAB ──────────────────────────────────────────────────────────
+        // ?? Main FAB ??????????????????????????????????????????????????????????
         Label plusIcon = IconLabel.of(IconLabel.PLUS, 20, "fab-main-icon");
         Button mainFab = new Button();
         mainFab.setGraphic(plusIcon);
@@ -407,16 +439,16 @@ public class TimetableMainPane extends AnchorPane {
         return btn;
     }
 
-    // ═══════════════════════════════════════════════════════════════════════════
+    // ????????????????????????????????????????????????????????????????????????????
     // Sub-panel sliding animation
-    // ═══════════════════════════════════════════════════════════════════════════
+    // ????????????????????????????????????????????????????????????????????????????
 
     private void slideToPane(String from, String to) {
         Region enter = paneFor(to);
         Region leave = paneFor(from);
         if (enter == leave) return;
 
-        // Returning to MAIN — slide the current sub-panel back out
+        // Returning to MAIN ??slide the current sub-panel back out
         if (enter == null) {
             if (leave == null) return;
             leave.setVisible(true);
@@ -441,14 +473,14 @@ public class TimetableMainPane extends AnchorPane {
         enter.setManaged(true);
 
         if (leave == null) {
-            // Coming from MAIN — just slide the new panel in
+            // Coming from MAIN ??just slide the new panel in
             new Timeline(new KeyFrame(Duration.millis(280),
                 new KeyValue(enter.translateXProperty(), 0, Interpolator.EASE_BOTH))
             ).play();
             return;
         }
 
-        // Sub-panel to sub-panel (e.g. LIST → CREATE)
+        // Sub-panel to sub-panel (e.g. LIST ??CREATE)
         Timeline tl = new Timeline(new KeyFrame(Duration.millis(280),
             new KeyValue(enter.translateXProperty(), 0,    Interpolator.EASE_BOTH),
             new KeyValue(leave.translateXProperty(), -dir, Interpolator.EASE_BOTH)));
@@ -479,7 +511,7 @@ public class TimetableMainPane extends AnchorPane {
             case "ADD"    -> addClassPane;
             case "LIST"   -> listPane;
             case "CREATE" -> createPane;
-            default       -> null;   // "MAIN" maps to null — no sub-panel overlay
+            default       -> null;   // "MAIN" maps to null ??no sub-panel overlay
         };
     }
 }

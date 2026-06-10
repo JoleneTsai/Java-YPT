@@ -1,4 +1,4 @@
-package com.timeapp.model;
+package com.timeapp.ui.model;
 
 import javafx.beans.property.BooleanProperty;
 import javafx.beans.property.SimpleBooleanProperty;

@@ -1,4 +1,4 @@
-package com.timeapp.model;
+package com.timeapp.ui.model;
 
 import javafx.beans.property.*;
 import javafx.collections.*;
@@ -15,13 +15,13 @@ import java.util.UUID;
  * held by the semester container; TimetableClass instances are derived from
  * it at render time by DashboardController.
  *
- * A single course can recur on multiple days/times — e.g. a course that meets
- * Monday 09:00–10:30 AND Wednesday 09:00–10:30 is represented as ONE
+ * A single course can recur on multiple days/times ??e.g. a course that meets
+ * Monday 09:00??0:30 AND Wednesday 09:00??0:30 is represented as ONE
  * TimetableClassRecord with TWO ClassTimeSlot entries.
  */
 public class TimetableClassRecord {
 
-    // ── Preset accent colors for card theming ─────────────────────────────────
+    // ?? Preset accent colors for card theming ?????????????????????????????????
     public enum AccentColor {
         PURPLE ("#9B72FF", "#F5F0FF"),
         BLUE   ("#4A9EFF", "#F0F4FF"),
@@ -37,7 +37,7 @@ public class TimetableClassRecord {
         AccentColor(String strip, String bg) { this.strip = strip; this.bg = bg; }
     }
 
-    // ── Time slot: one recurrence instance ────────────────────────────────────
+    // ?? Time slot: one recurrence instance ????????????????????????????????????
     public static class ClassTimeSlot {
         private final ObjectProperty<DayOfWeek> day       = new SimpleObjectProperty<>();
         private final ObjectProperty<LocalTime> startTime = new SimpleObjectProperty<>();
@@ -58,7 +58,7 @@ public class TimetableClassRecord {
         public ObjectProperty<LocalTime> endTimeProperty()   { return endTime; }
     }
 
-    // ── Fields ────────────────────────────────────────────────────────────────
+    // ?? Fields ????????????????????????????????????????????????????????????????
 
     private final String id = UUID.randomUUID().toString();
 
@@ -73,7 +73,7 @@ public class TimetableClassRecord {
     private final ObservableList<ClassTimeSlot> timeSlots =
             FXCollections.observableArrayList();
 
-    // ── Constructors ──────────────────────────────────────────────────────────
+    // ?? Constructors ??????????????????????????????????????????????????????????
 
     public TimetableClassRecord(String subject, String teacher,
                                  String classroom, AccentColor color) {
@@ -92,12 +92,12 @@ public class TimetableClassRecord {
         return r;
     }
 
-    // ── Mutation ──────────────────────────────────────────────────────────────
+    // ?? Mutation ??????????????????????????????????????????????????????????????
 
     public void addTimeSlot(ClassTimeSlot slot) { timeSlots.add(slot); }
     public void removeTimeSlot(ClassTimeSlot slot) { timeSlots.remove(slot); }
 
-    // ── Property accessors ────────────────────────────────────────────────────
+    // ?? Property accessors ????????????????????????????????????????????????????
 
     public String                             getId()          { return id; }
     public String                             getSubject()     { return subject.get(); }

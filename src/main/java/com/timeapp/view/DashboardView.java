@@ -2,6 +2,7 @@ package com.timeapp.view;
 
 import com.timeapp.controller.DashboardController;
 import com.timeapp.view.timetable.TimetableMainPane;
+import com.timeapp.view.calendar.CalendarMainPane;
 import javafx.animation.*;
 import javafx.geometry.*;
 import javafx.scene.control.*;
@@ -44,6 +45,7 @@ public class DashboardView {
     // Content sections
     private BorderPane        timelineSection;
     private TimetableMainPane timetableSection;
+    private CalendarMainPane  calendarSection;
 
     public DashboardView() {
         ctrl = new DashboardController();
@@ -72,7 +74,10 @@ public class DashboardView {
         timetableSection.setVisible(false);
         timetableSection.setManaged(false);
 
-        contentStack.getChildren().addAll(timelineSection, timetableSection);
+        calendarSection = new CalendarMainPane(ctrl);
+        calendarSection.setVisible(false);
+        calendarSection.setManaged(false);
+        contentStack.getChildren().addAll(timelineSection, timetableSection, calendarSection);
         root.getChildren().add(contentStack);
 
         // ── [z=1]  Dim overlay ────────────────────────────────────────────────
@@ -190,8 +195,16 @@ public class DashboardView {
      * managed=false) so it receives no mouse events.
      */
     private void animatePanelSwitch(String leaving, String entering) {
-        Region enterNode = "TIMETABLE".equals(entering) ? timetableSection : timelineSection;
-        Region leaveNode = "TIMETABLE".equals(leaving)  ? timetableSection : timelineSection;
+        Region enterNode = switch (entering) {
+            case "TIMETABLE" -> timetableSection;
+            case "CALENDAR"  -> calendarSection;
+            default          -> timelineSection;
+        };
+        Region leaveNode = switch (leaving) {
+            case "TIMETABLE" -> timetableSection;
+            case "CALENDAR"  -> calendarSection;
+            default          -> timelineSection;
+        };
 
         if (enterNode == leaveNode) return;
 
