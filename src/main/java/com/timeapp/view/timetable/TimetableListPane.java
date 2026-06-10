@@ -1,7 +1,7 @@
 package com.timeapp.view.timetable;
 
 import com.timeapp.controller.DashboardController;
-import com.timeapp.model.TimeTable;
+import com.timeapp.ui.model.TimeTable;
 import com.timeapp.view.IconLabel;
 import javafx.collections.ListChangeListener;
 import javafx.geometry.*;
@@ -14,23 +14,15 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 /**
- * Panel 3 — TimeTable List & Selector Screen.
+ * Panel 3 -- TimeTable List & Selector Screen.
  *
- * Triggered from Panel 1's FAB → "TimeTable".
+ * FIX (v10):
+ *   The bottom-right mini-FAB was invisible because ScrollPane(Priority.ALWAYS)
+ *   consumed all remaining height, giving the FAB wrapper zero height.
  *
- * Shows all known semesters in two sections:
- *   • "Active / Ongoing"  — endDate >= today
- *   • "Archived / Past"   — endDate <  today
- *
- * Selection indicator:
- *   Active timetable → filled blue circle  (.tt-list-indicator-active)
- *   Other entries    → outline grey circle (.tt-list-indicator-inactive)
- *
- * Tapping a row calls ctrl.setActiveTimetable(tt), which triggers the
- * activeTimetableProperty listener → buildList() rebuilds to reflect
- * the new selection instantly.
- *
- * Mini-FAB (bottom-right) navigates to Panel 4 to create a new timetable.
+ *   Fix: move the "+" button into the top bar right side (replacing the spacer),
+ *   consistent with how Panel 2 (AddClass) and Panel 4 (CreateTimeTable) work.
+ *   The bottom FAB row and buildFabRow()/buildMiniFab() methods are removed.
  */
 public class TimetableListPane extends VBox {
 
@@ -42,14 +34,10 @@ public class TimetableListPane extends VBox {
         getStyleClass().add("page");
         setFillWidth(true);
 
-        getChildren().addAll(buildHeader(), buildScrollArea(), buildFabRow());
+        getChildren().addAll(buildHeader(), buildScrollArea());
 
-        // Rebuild list whenever the timetable master list changes
-        ctrl.getTimetableList().addListener(
-            (ListChangeListener<TimeTable>) c -> buildList());
-        // Rebuild when the active timetable selection changes (circle indicators)
-        ctrl.activeTimetableProperty().addListener(
-            (obs, o, n) -> buildList());
+        ctrl.getTimetableList().addListener((ListChangeListener<TimeTable>) c -> buildList());
+        ctrl.activeTimetableProperty().addListener((obs, o, n) -> buildList());
 
         buildList();
     }
@@ -62,6 +50,7 @@ public class TimetableListPane extends VBox {
         bar.setAlignment(Pos.CENTER_LEFT);
         bar.setPadding(new Insets(16, 20, 16, 20));
 
+        // Back to Panel 1
         Label backIcon = IconLabel.of(IconLabel.CHEVRON_LEFT, 18, "topbar-icon");
         Button backBtn = new Button();
         backBtn.setGraphic(backIcon);
@@ -69,18 +58,24 @@ public class TimetableListPane extends VBox {
         backBtn.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
         backBtn.setOnAction(e -> ctrl.backToTimetableMain());
 
+        // Title (centered)
         Label title = new Label("TimeTable");
         title.getStyleClass().add("tt-panel-title");
         HBox.setHgrow(title, Priority.ALWAYS);
         title.setAlignment(Pos.CENTER);
         title.setMaxWidth(Double.MAX_VALUE);
 
-        // Right spacer keeps title centred despite the left-aligned back button
-        Region spacer = new Region();
-        spacer.setPrefWidth(40);
-        spacer.setMinWidth(40);
+        // "+" button on the right -- navigates to Panel 4 (Create New TimeTable)
+        // FIX: replaces the old Region spacer which was just dead space.
+        Label plusIcon = IconLabel.of(IconLabel.PLUS, 18, "tt-save-icon");
+        Button addBtn  = new Button();
+        addBtn.setGraphic(plusIcon);
+        addBtn.getStyleClass().addAll("icon-btn", "tt-save-btn");
+        addBtn.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
+        addBtn.setOnAction(e -> ctrl.showCreateTimetable());
+        Tooltip.install(addBtn, new Tooltip("Create New TimeTable"));
 
-        bar.getChildren().addAll(backBtn, title, spacer);
+        bar.getChildren().addAll(backBtn, title, addBtn);
         return bar;
     }
 
@@ -96,18 +91,6 @@ public class TimetableListPane extends VBox {
         sp.getStyleClass().add("timeline-scroll");
         VBox.setVgrow(sp, Priority.ALWAYS);
         return sp;
-    }
-
-    // ── Mini FAB row (bottom-right) ───────────────────────────────────────────
-
-    private StackPane buildFabRow() {
-        Button miniFab = buildMiniFab();
-        StackPane wrapper = new StackPane(miniFab);
-        StackPane.setAlignment(miniFab, Pos.BOTTOM_RIGHT);
-        wrapper.setPadding(new Insets(0, 20, 36, 0));
-        wrapper.setPickOnBounds(false);
-        VBox.setVgrow(wrapper, Priority.NEVER);
-        return wrapper;
     }
 
     // ── List building ─────────────────────────────────────────────────────────
@@ -167,43 +150,33 @@ public class TimetableListPane extends VBox {
         VBox textBox = new VBox(3, nameLbl, dateLbl);
         HBox.setHgrow(textBox, Priority.ALWAYS);
 
-        // Selection indicator circle
+        Button editBtn = new Button("Edit");
+        editBtn.getStyleClass().add("tt-add-time-btn");
+        editBtn.setOnAction(e -> { e.consume(); ctrl.editTimetable(tt); });
+
+        Button deleteBtn = new Button("Delete");
+        deleteBtn.getStyleClass().add("tt-add-time-btn");
+        deleteBtn.setOnAction(e -> { e.consume(); ctrl.deleteTimetable(tt); });
+
         Circle indicator = new Circle(9);
         indicator.getStyleClass().add(
             isActive ? "tt-list-indicator-active" : "tt-list-indicator-inactive");
 
-        HBox row = new HBox(12, textBox, indicator);
+        HBox row = new HBox(12, textBox, editBtn, deleteBtn, indicator);
         row.setAlignment(Pos.CENTER_LEFT);
         row.setPadding(new Insets(16, 20, 16, 20));
         row.getStyleClass().add("tt-list-row");
         HBox.setMargin(indicator, new Insets(0, 0, 0, 8));
 
-        // Thin separator line below each row
         Region sep = new Region();
         sep.getStyleClass().add("tt-form-separator");
-        sep.setPrefHeight(1);
-        sep.setMaxHeight(1);
+        sep.setPrefHeight(1); sep.setMaxHeight(1);
 
-        VBox rowWithSep = new VBox(row, sep);
-
-        // Click → change active timetable (triggers buildList() via listener)
+        // VBox wrapping row + separator (only the row is returned for getChildren.add)
         row.setOnMouseClicked(e -> ctrl.setActiveTimetable(tt));
         row.setOnMouseEntered(e -> row.getStyleClass().add("tt-list-row-hover"));
         row.setOnMouseExited(e  -> row.getStyleClass().remove("tt-list-row-hover"));
 
         return row;
-    }
-
-    // ── Mini FAB → Panel 4 ────────────────────────────────────────────────────
-
-    private Button buildMiniFab() {
-        Label plusIcon = IconLabel.of(IconLabel.PLUS, 18, "fab-main-icon");
-        Button btn = new Button();
-        btn.setGraphic(plusIcon);
-        btn.getStyleClass().addAll("fab-main", "tt-list-mini-fab");
-        btn.setContentDisplay(ContentDisplay.GRAPHIC_ONLY);
-        btn.setOnAction(e -> ctrl.showCreateTimetable());
-        Tooltip.install(btn, new Tooltip("Create New TimeTable"));
-        return btn;
     }
 }

@@ -1,0 +1,81 @@
+{
+  "calendarEvents": [
+    {
+      "title": "Test",
+      "startTime": "2026-06-12T09:00",
+      "endTime": "2026-06-12T10:00",
+      "location": "Room 65304",
+      "description": "Test Calendar",
+      "color": "#4A9EFF",
+      "tag": "schedule"
+    }
+  ],
+  "todoTasks": [
+    {
+      "title": "meeting",
+      "completed": false,
+      "scheduledDate": "2026-06-10",
+      "scheduledTime": "10:00"
+    },
+    {
+      "title": "jogging",
+      "completed": false,
+      "scheduledDate": "2026-06-12",
+      "scheduledTime": "11:00"
+    }
+  ],
+  "timetableEntries": [],
+  "timetables": [
+    {
+      "id": "a7148c05-1c69-48dd-9ff7-1b15bb1258ba",
+      "title": "113-2 Semester",
+      "startDate": "2026-04-01",
+      "endDate": "2026-10-31",
+      "classes": [
+        {
+          "title": "Java Software Development",
+          "dayOfWeek": "WEDNESDAY",
+          "startTime": "09:00",
+          "endTime": "12:00",
+          "room": "Room 65304",
+          "teacher": "Prof. Lee",
+          "color": "#9B72FF",
+          "tag": "class",
+          "semesterStart": "2026-04-01",
+          "semesterEnd": "2026-10-31"
+        },
+        {
+          "title": "Algorithm",
+          "dayOfWeek": "TUESDAY",
+          "startTime": "09:00",
+          "endTime": "10:30",
+          "room": "Room 4621",
+          "teacher": "Prof. Chen",
+          "color": "#4A9EFF",
+          "tag": "class",
+          "semesterStart": "2026-04-01",
+          "semesterEnd": "2026-10-31"
+        },
+        {
+          "title": "Algorithm",
+          "dayOfWeek": "THURSDAY",
+          "startTime": "09:00",
+          "endTime": "10:30",
+          "room": "Room 4621",
+          "teacher": "Prof. Chen",
+          "color": "#4A9EFF",
+          "tag": "class",
+          "semesterStart": "2026-04-01",
+          "semesterEnd": "2026-10-31"
+        }
+      ]
+    },
+    {
+      "id": "2888a576-a1e3-4321-be61-37c12aeb3168",
+      "title": "113-1",
+      "startDate": "2026-01-01",
+      "endDate": "2026-03-31",
+      "classes": []
+    }
+  ]
+}

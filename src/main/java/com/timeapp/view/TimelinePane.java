@@ -1,13 +1,12 @@
 package com.timeapp.view;
 
-import com.timeapp.model.*;
+import com.timeapp.ui.model.*;
 import javafx.collections.*;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.shape.*;
 
-import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -15,12 +14,24 @@ import java.util.List;
 /**
  * Scrollable vertical timeline showing hour markers and event cards.
  *
- * ── Change from previous version ─────────────────────────────────────────────
- * TimeEntry.getStartTime() / getEndTime() now return LocalDateTime.
- * All calls that previously passed LocalTime to timeToY() and the
- * formatter now extract the LocalTime component via .toLocalTime().
- * No layout math changes — ROW_H, GUTTER, PADDING are unchanged.
- * ─────────────────────────────────────────────────────────────────────────────
+ * FIX (v10):
+ *   - Time range separator changed from en-dash (U+2013) to " - " (ASCII hyphen).
+ *     The en-dash was saved as "??" in the source file due to a Windows encoding
+ *     issue and rendered as question marks at runtime.
+ *   - Location / professor / pin emoji labels (which showed as "?") replaced by
+ *     FontAwesome glyph icons via IconLabel.of(). FA glyphs are always available
+ *     because fa-solid-900.ttf is loaded programmatically in MainApp.start().
+ *
+ * Layout:
+ *   ScrollPane -> AnchorPane (canvas)
+ *     Hour labels + divider lines   (userData = "hour-row")
+ *     TimeEntry cards               (positioned by timeToY())
+ *
+ * Pixel math:
+ *   ROW_H   = 64 px per 60 minutes
+ *   GUTTER  = 56 px (left column for hour labels)
+ *   PADDING =  8 px (top gap before first label)
+ *   START_H =  7    (07:00 is the first visible hour)
  */
 public class TimelinePane {
 
@@ -81,11 +92,12 @@ public class TimelinePane {
             line.setUserData("hour-row");
 
             if (h < END_H) {
-                Line half = new Line(GUTTER, y + ROW_H / 2, totalWidth - 8, y + ROW_H / 2);
-                half.getStyleClass().add("half-hour-line");
-                half.setUserData("hour-row");
-                canvas.getChildren().add(half);
+                Line halfLine = new Line(GUTTER, y + ROW_H / 2, totalWidth - 8, y + ROW_H / 2);
+                halfLine.getStyleClass().add("half-hour-line");
+                halfLine.setUserData("hour-row");
+                canvas.getChildren().add(halfLine);
             }
+
             canvas.getChildren().addAll(lbl, line);
         }
     }
@@ -100,8 +112,7 @@ public class TimelinePane {
                 case TIMETABLE_CLASS -> buildTimetableCard((TimetableClass) entry);
             };
 
-            // Use toLocalTime() to extract time component from LocalDateTime
-            double y = timeToY(entry.getStartTime().toLocalTime());
+            double y = timeToY(entry.getStartTime());
             double h = Math.max(minutesToPx(entry.getDurationMinutes()), 44);
             double x = GUTTER + 4;
             double w = totalWidth - x - 8;
@@ -134,12 +145,12 @@ public class TimelinePane {
         todo.completedProperty().addListener((obs, o, n) ->
             title.setStyle(n ? "-fx-strikethrough: true; -fx-opacity: 0.45;" : ""));
 
-        // Format LocalDateTime → "HH:mm"
-        Label timeLabel = new Label(todo.getStartTime().toLocalTime().format(T_FMT));
+        Label timeLabel = new Label(todo.getStartTime().format(T_FMT));
         timeLabel.getStyleClass().add("todo-time");
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);
+
         box.getChildren().addAll(cb, title, spacer, timeLabel);
         return box;
     }
@@ -151,23 +162,20 @@ public class TimelinePane {
         card.getStyleClass().addAll("event-card", "event-card-blue");
         card.setPadding(new Insets(8, 10, 8, 12));
 
-        // Format LocalDateTime → "HH:mm"
+        // FIX: use ASCII " - " (hyphen) — en-dash caused "??" rendering on Windows
         Label timeRange = new Label(
-            ev.getStartTime().toLocalTime().format(T_FMT)
-            + " – " + ev.getEndTime().toLocalTime().format(T_FMT));
+            ev.getStartTime().format(T_FMT) + " - " + ev.getEndTime().format(T_FMT));
         timeRange.getStyleClass().add("card-time-range");
 
         Label title = new Label(ev.getTitle());
         title.getStyleClass().add("card-title");
         title.setWrapText(true);
 
-        HBox locRow = new HBox(4);
-        locRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        Label pin = new Label("📍");
-        pin.setStyle("-fx-font-size: 10px;");
-        Label loc = new Label(ev.getLocation() != null ? ev.getLocation() : "");
-        loc.getStyleClass().add("card-location");
-        locRow.getChildren().addAll(pin, loc);
+        // FIX: FA glyph icon replaces emoji "??" (map-marker \uf041)
+        HBox locRow = buildIconRow(
+            IconLabel.of(IconLabel.MAP_MARKER, 10, "card-icon"),
+            ev.getLocation(),
+            "card-location");
 
         card.getChildren().addAll(timeRange, title, locRow);
 
@@ -179,6 +187,7 @@ public class TimelinePane {
         outer.getStyleClass().add("card-outer");
         outer.getChildren().addAll(strip, card);
         HBox.setHgrow(card, Priority.ALWAYS);
+        outer.setStyle("-fx-background-radius: 10; -fx-background-color: transparent;");
         return outer;
     }
 
@@ -189,31 +198,22 @@ public class TimelinePane {
         card.getStyleClass().addAll("event-card", "event-card-purple");
         card.setPadding(new Insets(8, 10, 8, 12));
 
-        // Format LocalDateTime → "HH:mm"
+        // FIX: use ASCII " - " (hyphen)
         Label timeRange = new Label(
-            cls.getStartTime().toLocalTime().format(T_FMT)
-            + " – " + cls.getEndTime().toLocalTime().format(T_FMT));
+            cls.getStartTime().format(T_FMT) + " - " + cls.getEndTime().format(T_FMT));
         timeRange.getStyleClass().add("card-time-range");
 
         Label title = new Label(cls.getTitle());
         title.getStyleClass().add("card-title");
         title.setWrapText(true);
 
-        HBox locRow = new HBox(4);
-        locRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        Label pin = new Label("🏫");
-        pin.setStyle("-fx-font-size: 10px;");
-        Label loc = new Label(cls.getRoom() != null ? cls.getRoom() : "");
-        loc.getStyleClass().add("card-location");
-        locRow.getChildren().addAll(pin, loc);
-
-        HBox profRow = new HBox(4);
-        profRow.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
-        Label personIcon = new Label("👤");
-        personIcon.setStyle("-fx-font-size: 10px;");
-        Label prof = new Label(cls.getTeacher() != null ? cls.getTeacher() : "");
-        prof.getStyleClass().add("card-professor");
-        profRow.getChildren().addAll(personIcon, prof);
+        // FIX: FA glyph icons replace broken emoji "?" characters
+        HBox locRow  = buildIconRow(
+            IconLabel.of(IconLabel.MAP_MARKER, 10, "card-icon"),
+            cls.getLocation(), "card-location");
+        HBox profRow = buildIconRow(
+            IconLabel.of(IconLabel.USER,       10, "card-icon"),
+            cls.getProfessor(), "card-professor");
 
         card.getChildren().addAll(timeRange, title, locRow, profRow);
 
@@ -225,12 +225,22 @@ public class TimelinePane {
         outer.getStyleClass().add("card-outer");
         outer.getChildren().addAll(strip, card);
         HBox.setHgrow(card, Priority.ALWAYS);
+        outer.setStyle("-fx-background-radius: 10; -fx-background-color: transparent;");
         return outer;
     }
 
-    // ── Conversion helpers ────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
-    /** Converts LocalTime to a Y-pixel position on the canvas. */
+    /** Builds an icon + text row. iconLabel should come from IconLabel.of(). */
+    private HBox buildIconRow(Label iconLabel, String text, String textStyleClass) {
+        HBox row = new HBox(4);
+        row.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+        Label textLbl = new Label(text != null ? text : "");
+        textLbl.getStyleClass().add(textStyleClass);
+        row.getChildren().addAll(iconLabel, textLbl);
+        return row;
+    }
+
     private double timeToY(LocalTime t) {
         double hours = t.getHour() + t.getMinute() / 60.0;
         return PADDING + (hours - START_H) * ROW_H;

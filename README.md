@@ -29,6 +29,24 @@ TimeManagementApp/
     │       ├── controller/
     │       │   └── DashboardController.java        All state properties + action methods
     │       │
+    │       ├── domain/                             Pure Java domain + persistence layer
+    │       │   ├── model/
+    │       │   │   ├── ScheduleData.java           Root JSON persistence object
+    │       │   │   ├── TimetableData.java          Persisted timetable container
+    │       │   │   ├── TimetableEntry.java         Persisted recurring class rule
+    │       │   │   ├── CalendarEvent.java          Persisted full-date calendar event
+    │       │   │   ├── ToDoTask.java               Persisted to-do task
+    │       │   │   ├── Schedulable.java            Timeline-compatible event interface
+    │       │   │   ├── EventType.java              CALENDAR / TIMETABLE
+    │       │   │   └── ExpandedTimetableEvent.java Concrete dated class occurrence
+    │       │   ├── repository/
+    │       │   │   ├── ScheduleRepository.java     Storage abstraction
+    │       │   │   └── JsonScheduleRepository.java JSON load/save implementation
+    │       │   └── service/
+    │       │       ├── ScheduleService.java         Data facade called by controller
+    │       │       ├── TimetableExpander.java       Recurring classes -> dated events
+    │       │       └── TimelineBuilder.java         Merge + sort timeline entries
+    │       │
     │       └── view/
     │           ├── DashboardView.java              Root AnchorPane — layer stack + panel switching
     │           ├── IconLabel.java                  FontAwesome glyph factory
@@ -135,11 +153,11 @@ Tap "TimeTable" nav  navigateTo("TimeTable")    activePanel = TIMETABLE cross-fa
 Tap "TimeLine" nav   navigateTo("TimeLine")     activePanel = TIMELINE  cross-fade back to TimelinePane
 Tap "Add Class" FAB  showAddClassPane()         activeTimetablePane=ADD Panel 2 slides in from right
 Tap back arrow (P2)  backToTimetableMain()      activeTimetablePane=MAIN Panel 2 slides out
-Tap save (P2)        saveClass(record)          classes list grows      Timeline re-renders for today
+Tap save (P2)        saveClass(record)          classes list grows      Timeline re-renders + JSON saves
 Tap "TimeTable" FAB  showTimetableList()        activeTimetablePane=LIST Panel 3 slides in
 Tap row (P3)         setActiveTimetable(tt)     activeTimetable = tt    Panel 3 circle indicators rebuild
 Tap mini-FAB (P3)    showCreateTimetable()      activeTimetablePane=CREATE Panel 4 slides in
-Tap save (P4)        saveNewTimetable(…)        timetableList grows     Panel 3 list rebuilds · P4 closes
+Tap save (P4)        saveNewTimetable(…)        timetableList grows     Panel 3 rebuilds · JSON saves
 ```
 
 ---
@@ -152,14 +170,14 @@ The four panels form a linear navigation stack managed by
 ```
 Panel 1 — TimetableMainPane   (always-visible base)
 │   FAB → "Add Class"    ──────────────────────────► Panel 2 — TimetableAddClassPane
-│                                                        [✓ Save]  → ctrl.saveClass()  → back to Panel 1
+│                                                        [✓ Save]  → ctrl.saveClass()  → service.saveData()
 │                                                        [‹ Back]  → back to Panel 1
 │
 │   FAB → "TimeTable"    ──────────────────────────► Panel 3 — TimetableListPane
 │                                                        Tap row   → ctrl.setActiveTimetable()
 │                                                        [‹ Back]  → back to Panel 1
 │                                                        Mini-FAB  ────────────────────► Panel 4 — TimetableCreatePane
-│                                                                                            [✓ Save] → ctrl.saveNewTimetable()
+│                                                                                            [✓ Save] → ctrl.saveNewTimetable() → service.saveData()
 │                                                                                            [‹ Back] → back to Panel 3
 ```
 
@@ -287,6 +305,142 @@ TimeTable
 ├── boolean isDateInRange(LocalDate)   ← used by Timeline filtering
 └── ObservableList<TimetableClassRecord> classes
 ```
+
+### Persistence model (domain)
+
+The UI model and persistence model are intentionally separate:
+
+| Layer | Class | Purpose |
+|---|---|---|
+| UI | `com.timeapp.model.TimeTable` | JavaFX observable semester object used by views |
+| UI | `com.timeapp.model.TimetableClassRecord` | JavaFX observable class form/list object |
+| Domain | `com.timeapp.domain.model.TimetableData` | Plain Java timetable container saved to JSON |
+| Domain | `com.timeapp.domain.model.TimetableEntry` | Plain Java recurring class rule saved to JSON |
+
+`DashboardController` converts between UI objects and domain objects when
+loading or saving. This keeps JavaFX `Property<>` objects out of the JSON layer.
+
+```
+ScheduleData
+├── List<CalendarEvent> calendarEvents
+├── List<ToDoTask> todoTasks
+├── List<TimetableEntry> timetableEntries   (legacy-compatible list)
+└── List<TimetableData> timetables          (full timetable persistence)
+
+TimetableData
+├── String id
+├── String title
+├── LocalDate startDate
+├── LocalDate endDate
+└── List<TimetableEntry> classes
+```
+
+---
+
+## Persistence: JSON Storage
+
+`DashboardController` owns a `ScheduleService` wired to:
+
+```java
+new JsonScheduleRepository("schedule-data.json")
+```
+
+Save class flow:
+
+```
+UI Save Class
+→ DashboardController.saveClass(record)
+→ ScheduleService.addClassToTimetable(timetableId, entry)
+→ ScheduleService.saveData()
+→ JsonScheduleRepository.saveAll(data)
+→ schedule-data.json
+```
+
+Save timetable flow:
+
+```
+UI Save TimeTable
+→ DashboardController.saveNewTimetable(title, start, end)
+→ ScheduleService.addTimetable(timetableData)
+→ JsonScheduleRepository.saveAll(data)
+→ schedule-data.json
+```
+
+Startup flow:
+
+```
+DashboardController()
+→ ScheduleService.loadData()
+→ JsonScheduleRepository.loadAll()
+→ ScheduleData.timetables
+→ converted back to UI TimeTable / TimetableClassRecord
+```
+
+### Current JSON shape
+
+```json
+{
+  "calendarEvents": [],
+  "todoTasks": [],
+  "timetableEntries": [],
+  "timetables": [
+    {
+      "id": "semester-113-2",
+      "title": "113-2 Semester",
+      "startDate": "2026-02-17",
+      "endDate": "2026-06-20",
+      "classes": [
+        {
+          "title": "Linear Algebra",
+          "dayOfWeek": "WEDNESDAY",
+          "startTime": "10:00",
+          "endTime": "12:00",
+          "room": "A101",
+          "teacher": "Prof. Lee",
+          "color": "#4A9EFF",
+          "tag": "課程",
+          "semesterStart": "2026-02-17",
+          "semesterEnd": "2026-06-20"
+        }
+      ]
+    }
+  ]
+}
+```
+
+### Backward compatibility
+
+Older JSON files may only contain `timetableEntries`. The controller can still
+load those entries, group them into a saved timetable, and persist them back
+through the new `timetables` structure. Timeline expansion uses
+`timetables[].classes` first, and only falls back to legacy `timetableEntries`
+when no full timetable data exists.
+
+### Verified in version 8
+
+- Domain layer compiles with `javac`.
+- `JsonScheduleRepository.saveAll()` writes the new `timetables` JSON structure.
+- `JsonScheduleRepository.loadAll()` reads the new structure back.
+- A saved timetable preserves `title`, `startDate`, `endDate`, and `classes`.
+- `git diff --check` passes.
+
+### Still needs full app verification
+
+This environment does not have Maven / JavaFX dependencies installed, so full
+JavaFX startup was not verified here. On a machine with Maven, run:
+
+```bash
+mvn compile
+mvn javafx:run
+```
+
+Manual UI checks:
+
+- Create an empty TimeTable, restart, and confirm it still appears.
+- Add a class, restart, and confirm the TimeTable title/date/classes remain.
+- Confirm `schedule-data.json` updates after saving TimeTable/Class.
+- Confirm legacy `timetableEntries` data still loads if present.
+- Confirm existing timetable grid and timeline rendering still work.
 
 ---
 
