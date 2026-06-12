@@ -3,6 +3,8 @@ package com.timeapp.view;
 import com.timeapp.controller.DashboardController;
 import com.timeapp.view.timetable.TimetableMainPane;
 import com.timeapp.view.calendar.CalendarMainPane;
+import com.timeapp.view.AddSchedulePane;
+import com.timeapp.view.AddTodoPane;
 import javafx.animation.*;
 import javafx.geometry.*;
 import javafx.scene.control.*;
@@ -46,6 +48,8 @@ public class DashboardView {
     private BorderPane        timelineSection;
     private TimetableMainPane timetableSection;
     private CalendarMainPane  calendarSection;
+    private AddSchedulePane   addSchedulePane;
+    private AddTodoPane       addTodoPane;
 
     public DashboardView() {
         ctrl = new DashboardController();
@@ -129,6 +133,29 @@ public class DashboardView {
         // ── Panel-switch wiring ───────────────────────────────────────────────
         ctrl.activePanelProperty().addListener((obs, oldPanel, newPanel) ->
             animatePanelSwitch(oldPanel, newPanel));
+
+        // ── [z=4/5]  Overlay panels (Add Schedule / Add To-do) ───────────────
+        // Slide in from the right over any active section.
+        addSchedulePane = new AddSchedulePane(ctrl);
+        addSchedulePane.setVisible(false);
+        addSchedulePane.setManaged(false);
+        addSchedulePane.setTranslateX(390);
+
+        addTodoPane = new AddTodoPane(ctrl);
+        addTodoPane.setVisible(false);
+        addTodoPane.setManaged(false);
+        addTodoPane.setTranslateX(390);
+
+        for (Region pane : new Region[]{addSchedulePane, addTodoPane}) {
+            AnchorPane.setTopAnchor(pane,    0.0);
+            AnchorPane.setBottomAnchor(pane, 0.0);
+            AnchorPane.setLeftAnchor(pane,   0.0);
+            AnchorPane.setRightAnchor(pane,  0.0);
+            root.getChildren().add(pane);
+        }
+
+        // Wire overlay navigation
+        ctrl.overlayPaneProperty().addListener((obs, from, to) -> slideOverlay(from, to));
     }
 
     // ── Timeline section ──────────────────────────────────────────────────────
@@ -228,4 +255,40 @@ public class DashboardView {
         });
         tl.play();
     }
+
+    // ── Overlay slide animation ───────────────────────────────────────────────
+
+    private void slideOverlay(String from, String to) {
+        Region enterPane = overlayPaneFor(to);
+        Region leavePane = overlayPaneFor(from);
+
+        if (enterPane != null) {
+            enterPane.setVisible(true);
+            enterPane.setManaged(true);
+            enterPane.setTranslateX(390);
+            new Timeline(new KeyFrame(Duration.millis(280),
+                new KeyValue(enterPane.translateXProperty(), 0, Interpolator.EASE_BOTH))
+            ).play();
+        }
+
+        if (leavePane != null && leavePane != enterPane) {
+            Timeline tl = new Timeline(new KeyFrame(Duration.millis(280),
+                new KeyValue(leavePane.translateXProperty(), 390, Interpolator.EASE_BOTH)));
+            tl.setOnFinished(e -> {
+                leavePane.setVisible(false);
+                leavePane.setManaged(false);
+            });
+            tl.play();
+        }
+    }
+
+    private Region overlayPaneFor(String name) {
+        if (name == null) return null;
+        return switch (name) {
+            case "ADD_SCHEDULE" -> addSchedulePane;
+            case "ADD_TODO"     -> addTodoPane;
+            default             -> null;
+        };
+    }
+
 }

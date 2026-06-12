@@ -1,6 +1,7 @@
 package com.timeapp;
 
 import com.timeapp.view.DashboardView;
+import java.util.Locale;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.scene.text.Font;
@@ -111,6 +112,8 @@ public class MainApp extends Application {
     }
 
     public static void main(String[] args) {
+        // Force English locale so DatePicker popup displays month names in English
+        Locale.setDefault(Locale.ENGLISH);
         launch(args);
     }
 }
