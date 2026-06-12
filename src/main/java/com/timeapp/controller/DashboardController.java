@@ -106,6 +106,18 @@ public class DashboardController {
     private final javafx.beans.property.IntegerProperty calendarDataVersion =
             new javafx.beans.property.SimpleIntegerProperty(0);
 
+    // -- Overlay panel state --------------------------------------------------
+
+    /**
+     * "NONE" | "ADD_SCHEDULE" | "ADD_TODO"
+     * DashboardView observes this to slide AddSchedulePane / AddTodoPane in.
+     */
+    private final StringProperty overlayPane =
+            new SimpleStringProperty("NONE");
+
+    /** The default date pre-filled in overlay forms when they open. */
+    private java.time.LocalDate pendingAddDate = java.time.LocalDate.now();
+
     // ?? Formatters ????????????????????????????????????????????????????????????
 
     public static final DateTimeFormatter HEADER_FMT =
@@ -173,12 +185,14 @@ public class DashboardController {
 
     public void onAddSchedule() {
         collapseFab();
-        showAddScheduleDialog(selectedDay.get());
+        pendingAddDate = selectedDay.get();
+        overlayPane.set("ADD_SCHEDULE");
     }
 
     public void onAddTodo() {
         collapseFab();
-        showAddTodoDialog();
+        pendingAddDate = selectedDay.get();
+        overlayPane.set("ADD_TODO");
     }
 
     private void showAddScheduleDialog(LocalDate defaultDate) {
@@ -336,7 +350,36 @@ public class DashboardController {
     // ?? Timetable sub-panel routing ???????????????????????????????????????????
 
     /** FAB "TimeTable" ??show Panel 3. */
-    // -- Calendar navigation ---------------------------------------------------
+    // -- Overlay panel actions ------------------------------------------------
+
+    /**
+     * Called by AddSchedulePane when the user taps Save.
+     * Persists the event, refreshes all views, closes the overlay.
+     */
+    public void saveSchedule(com.timeapp.domain.model.CalendarEvent event) {
+        scheduleService.addCalendarEvent(event);
+        loadEntriesForDay(selectedDay.get());
+        refreshCalendarViews();
+        closeOverlay();
+    }
+
+    /**
+     * Called by AddTodoPane when the user taps Save.
+     */
+    public void saveTodo(com.timeapp.domain.model.ToDoTask task) {
+        scheduleService.addToDoTask(task);
+        loadEntriesForDay(selectedDay.get());
+        closeOverlay();
+    }
+
+    /** Slides the overlay panel back out (back button or after save). */
+    public void closeOverlay() {
+        overlayPane.set("NONE");
+    }
+
+    public java.time.LocalDate getPendingAddDate() { return pendingAddDate; }
+
+        // -- Calendar navigation ---------------------------------------------------
 
     public void showCalendarDayView(java.time.LocalDate date) {
         selectedCalendarDate.set(date);
@@ -351,7 +394,8 @@ public class DashboardController {
 
     public void onAddScheduleForDate(java.time.LocalDate date) {
         collapseFab();
-        showAddScheduleDialog(date != null ? date : selectedDay.get());
+        pendingAddDate = date != null ? date : selectedDay.get();
+        overlayPane.set("ADD_SCHEDULE");
     }
 
     private void loadCalendarDayEvents(java.time.LocalDate date) {
@@ -1093,4 +1137,9 @@ public class DashboardController {
 
         return workingFile.toString();
     }
+
+    // Overlay panel accessors
+    public javafx.beans.property.StringProperty overlayPaneProperty() { return overlayPane; }
+    public String                               getOverlayPane()       { return overlayPane.get(); }
+
 }
