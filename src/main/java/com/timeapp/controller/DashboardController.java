@@ -62,6 +62,10 @@ public class DashboardController {
     private final ObservableList<TimeEntry> dayEntries =
             FXCollections.observableArrayList();
 
+    /** Bumped whenever persisted data changes so views can refresh summaries. */
+    private final IntegerProperty dataRevision =
+            new SimpleIntegerProperty(0);
+
     // ?? Timetable domain state ????????????????????????????????????????????????
 
     /** All semester timetables created in the UI. */
@@ -87,6 +91,10 @@ public class DashboardController {
      */
     private final StringProperty activePanel =
             new SimpleStringProperty("TIMELINE");
+
+    /** Current timeline sub-panel: "MAIN", "ADD_SCHEDULE", or "ADD_TODO". */
+    private final StringProperty activeTimelinePane =
+            new SimpleStringProperty("MAIN");
 
     // ?? Formatters ????????????????????????????????????????????????????????????
 
@@ -115,7 +123,6 @@ public class DashboardController {
         );
         scheduleService.loadData();
         loadPersistedTimetables();
-        if (timetableList.isEmpty()) seedTimetables();
         loadEntriesForDay(selectedDay.get());
         selectedDay.addListener((obs, o, n) -> loadEntriesForDay(n));
         activeTimetable.addListener((obs, o, n) -> loadEntriesForDay(selectedDay.get()));
@@ -155,12 +162,56 @@ public class DashboardController {
 
     public void onAddSchedule() {
         collapseFab();
-        showAddScheduleDialog();
+        showAddSchedulePane();
     }
 
     public void onAddTodo() {
         collapseFab();
-        showAddTodoDialog();
+        showAddTodoPane();
+    }
+
+    public void showAddSchedulePane() {
+        activeTimelinePane.set("ADD_SCHEDULE");
+        closeSidebar();
+        collapseFab();
+    }
+
+    public void showAddTodoPane() {
+        activeTimelinePane.set("ADD_TODO");
+        closeSidebar();
+        collapseFab();
+    }
+
+    public void backToTimelineMain() {
+        activeTimelinePane.set("MAIN");
+    }
+
+    public void saveCalendarEvent(com.timeapp.domain.model.CalendarEvent event) {
+        if (event == null) {
+            return;
+        }
+        scheduleService.addCalendarEvent(event);
+        dataRevision.set(dataRevision.get() + 1);
+        if (event.getStartTime() != null) {
+            selectedDay.set(event.getStartTime().toLocalDate());
+            weekStart.set(sundayOf(event.getStartTime().toLocalDate()));
+        }
+        loadEntriesForDay(selectedDay.get());
+        backToTimelineMain();
+    }
+
+    public void saveTodoTask(String title, LocalDate date, LocalTime startTime) {
+        if (title == null || title.trim().isEmpty()) {
+            return;
+        }
+        scheduleService.addToDoTask(new ToDoTask(title.trim(), false, date, startTime));
+        dataRevision.set(dataRevision.get() + 1);
+        if (date != null) {
+            selectedDay.set(date);
+            weekStart.set(sundayOf(date));
+        }
+        loadEntriesForDay(selectedDay.get());
+        backToTimelineMain();
     }
 
     private void showAddScheduleDialog() {
@@ -270,11 +321,13 @@ public class DashboardController {
                 activePanel.set("TIMETABLE");
                 activeTimetablePane.set("MAIN");
             }
-            case "TimeLine"  -> activePanel.set("TIMELINE");
-            case "Calendar"  -> {
-                // Calendar section not yet implemented ??stay on timeline
+            case "TimeLine"  -> {
                 activePanel.set("TIMELINE");
-                System.out.println("[Navigation] Calendar ??not yet implemented");
+                activeTimelinePane.set("MAIN");
+            }
+            case "Calendar"  -> {
+                activePanel.set("CALENDAR");
+                activeTimelinePane.set("MAIN");
             }
             default -> System.out.println("[Navigation] Unknown view: " + viewName);
         }
@@ -291,7 +344,10 @@ public class DashboardController {
 
     /** FAB "Add Class" ??show Panel 2. */
     public void showAddClassPane() {
-        ensureActiveTimetable();
+        if (activeTimetable.get() == null) {
+            showCreateTimetable();
+            return;
+        }
         activeTimetablePane.set("ADD");
         closeSidebar();
         collapseFab();
@@ -322,10 +378,11 @@ public class DashboardController {
      */
     public void saveClass(TimetableClassRecord record) {
         if (record == null) return;
-        ensureActiveTimetable();
+        if (activeTimetable.get() == null) return;
         if (!hasAnyValidTimeSlot(record)) return;
         activeTimetable.get().getClasses().add(record);
         persistClassRecord(record, activeTimetable.get());
+        dataRevision.set(dataRevision.get() + 1);
         loadEntriesForDay(selectedDay.get());
         backToTimetableMain();
     }
@@ -339,6 +396,7 @@ public class DashboardController {
         timetableList.add(timetable);
         setActiveTimetable(timetable);
         persistTimetable(timetable);
+        dataRevision.set(dataRevision.get() + 1);
         backToTimetableList();
     }
 
@@ -396,6 +454,7 @@ public class DashboardController {
                 timetable.getEndDate()
             );
             rebuildPersistedClasses(timetable);
+            dataRevision.set(dataRevision.get() + 1);
             loadEntriesForDay(selectedDay.get());
         });
     }
@@ -411,6 +470,7 @@ public class DashboardController {
         if (timetableId != null) {
             scheduleService.deleteTimetable(timetableId);
         }
+        dataRevision.set(dataRevision.get() + 1);
 
         if (timetable.equals(activeTimetable.get())) {
             activeTimetable.set(timetableList.isEmpty() ? null : timetableList.get(0));
@@ -498,6 +558,7 @@ public class DashboardController {
             }
 
             rebuildPersistedClasses(timetable);
+            dataRevision.set(dataRevision.get() + 1);
             loadEntriesForDay(selectedDay.get());
         });
     }
@@ -511,6 +572,7 @@ public class DashboardController {
 
         timetable.getClasses().remove(record);
         rebuildPersistedClasses(timetable);
+        dataRevision.set(dataRevision.get() + 1);
         loadEntriesForDay(selectedDay.get());
     }
 
@@ -538,68 +600,32 @@ public class DashboardController {
     private void loadEntriesForDay(LocalDate date) {
         dayEntries.clear();
         if (date == null) return;
-        dayEntries.addAll(buildSampleEntries(date));
+        dayEntries.addAll(buildEntriesForDate(date));
     }
 
-    private List<TimeEntry> buildSampleEntries(LocalDate date) {
+    private List<TimeEntry> buildEntriesForDate(LocalDate date) {
         List<TimeEntry> list = new ArrayList<>();
-        DayOfWeek dow = date.getDayOfWeek();
-
-        // Always: morning to-dos
-        list.add(new TodoEntry(LocalTime.of(8,  0), "Review lecture notes"));
-        list.add(new TodoEntry(LocalTime.of(8, 30), "Reply to group-project emails"));
-        addPersistedTodos(list);
-
-        // Mon / Wed / Fri ??static sample timetable classes (shown when no
-        // active timetable is configured, so the app is demo-able immediately)
-        if (activeTimetable.get() == null &&
-            (dow == DayOfWeek.MONDAY || dow == DayOfWeek.WEDNESDAY || dow == DayOfWeek.FRIDAY)) {
-            list.add(new TimetableClass(
-                LocalTime.of(9, 0), LocalTime.of(10, 30),
-                "Algorithms & Data Structures", "Room 301, Eng. Building", "Prof. Chen Wei"));
-            list.add(new TimetableClass(
-                LocalTime.of(14, 0), LocalTime.of(15, 30),
-                "Linear Algebra", "Room 205, Math Block", "Prof. Sarah Kim"));
-        }
-
-        // Classes from the active timetable ??gated by semester date range
+        addPersistedTodos(list, date);
         addActiveTimetableClasses(list, date);
-
-        // Tue / Thu ??calendar events
-        if (dow == DayOfWeek.TUESDAY || dow == DayOfWeek.THURSDAY) {
-            list.add(new CalendarEvent(
-                LocalTime.of(10, 0), LocalTime.of(11, 0),
-                "Team Sprint Planning", "Zoom ??link in calendar"));
-            list.add(new CalendarEvent(
-                LocalTime.of(15, 0), LocalTime.of(16, 30),
-                "Library Study Session", "Central Library, 3F"));
-        }
-
         addPersistedCalendarEvents(list, date);
-
-        // Every day
-        list.add(new TodoEntry(LocalTime.of(12, 0), "Lunch & short walk"));
-        list.add(new CalendarEvent(
-            LocalTime.of(19, 0), LocalTime.of(20, 0),
-            "Gym ??Cardio Day", "University Sports Centre"));
-
         return list;
     }
 
-    private void addPersistedTodos(List<TimeEntry> list) {
+    private void addPersistedTodos(List<TimeEntry> list, LocalDate date) {
         List<ToDoTask> tasks = scheduleService.getToDoTasks();
         if (tasks == null || tasks.isEmpty()) {
             return;
         }
 
-        LocalTime time = LocalTime.of(9, 0);
         for (ToDoTask task : tasks) {
             if (task == null || task.getTitle() == null || task.getTitle().isBlank()
-                || task.isCompleted()) {
+                || task.isCompleted()
+                || task.getDate() == null
+                || task.getStartTime() == null
+                || !task.getDate().equals(date)) {
                 continue;
             }
-            list.add(new TodoEntry(time, task.getTitle()));
-            time = time.plusMinutes(30);
+            list.add(new TodoEntry(task.getStartTime(), task.getTitle()));
         }
     }
 
@@ -621,6 +647,57 @@ public class DashboardController {
                 nullToEmpty(event.getLocation())
             ));
         }
+    }
+
+    public List<ToDoTask> getIncompleteTodosOnDate(LocalDate date) {
+        List<ToDoTask> result = new ArrayList<>();
+        if (date == null || scheduleService.getToDoTasks() == null) {
+            return result;
+        }
+
+        for (ToDoTask task : scheduleService.getToDoTasks()) {
+            if (task == null || task.isCompleted()
+                || task.getDate() == null || task.getStartTime() == null
+                || !task.getDate().equals(date)) {
+                continue;
+            }
+            result.add(task);
+        }
+        result.sort(Comparator.comparing(ToDoTask::getStartTime));
+        return result;
+    }
+
+    public Set<LocalDate> getIncompleteTodoDates() {
+        Set<LocalDate> dates = new HashSet<>();
+        List<ToDoTask> tasks = scheduleService.getToDoTasks();
+        if (tasks == null) {
+            return dates;
+        }
+
+        for (ToDoTask task : tasks) {
+            if (task != null && !task.isCompleted() && task.getDate() != null) {
+                dates.add(task.getDate());
+            }
+        }
+        return dates;
+    }
+
+    public List<com.timeapp.domain.model.CalendarEvent> getCalendarEventsOnDate(LocalDate date) {
+        List<com.timeapp.domain.model.CalendarEvent> result = new ArrayList<>();
+        ScheduleData data = scheduleService.getData();
+        if (date == null || data == null || data.getCalendarEvents() == null) {
+            return result;
+        }
+
+        for (com.timeapp.domain.model.CalendarEvent event : data.getCalendarEvents()) {
+            if (event == null || event.getStartTime() == null
+                || !event.getStartTime().toLocalDate().equals(date)) {
+                continue;
+            }
+            result.add(event);
+        }
+        result.sort(Comparator.comparing(com.timeapp.domain.model.CalendarEvent::getStartTime));
+        return result;
     }
 
     /**
@@ -652,25 +729,7 @@ public class DashboardController {
     // ?? Sample seed data ??????????????????????????????????????????????????????
 
     private void seedTimetables() {
-        if (!timetableList.isEmpty()) return;
-
-        LocalDate semesterStart = LocalDate.now().withDayOfMonth(1);
-        TimeTable current = new TimeTable(
-            "Current Semester",
-            semesterStart,
-            semesterStart.plusMonths(5).minusDays(1));
-
-        current.getClasses().add(TimetableClassRecord.of(
-            "Algorithms & Data Structures", "Prof. Chen Wei", "Room 301",
-            TimetableClassRecord.AccentColor.PURPLE,
-            DayOfWeek.MONDAY, LocalTime.of(9, 0), LocalTime.of(10, 30)));
-        current.getClasses().add(TimetableClassRecord.of(
-            "Linear Algebra", "Prof. Sarah Kim", "Room 205",
-            TimetableClassRecord.AccentColor.BLUE,
-            DayOfWeek.WEDNESDAY, LocalTime.of(14, 0), LocalTime.of(15, 30)));
-
-        timetableList.add(current);
-        activeTimetable.set(current);
+        // Intentionally empty: a fresh install should start with no demo data.
     }
 
     private void loadPersistedTimetables() {
@@ -969,7 +1028,7 @@ public class DashboardController {
     }
 
     private void ensureActiveTimetable() {
-        if (activeTimetable.get() == null) seedTimetables();
+        // No automatic demo timetable: a new install should open empty.
     }
 
     // ?? Property accessors ????????????????????????????????????????????????????
@@ -978,18 +1037,22 @@ public class DashboardController {
     public ObjectProperty<LocalDate>    selectedDayProperty()        { return selectedDay; }
     public BooleanProperty              sidebarOpenProperty()        { return sidebarOpen; }
     public BooleanProperty              fabExpandedProperty()        { return fabExpanded; }
+    public IntegerProperty              dataRevisionProperty()       { return dataRevision; }
     public ObservableList<TimeEntry>    getDayEntries()              { return dayEntries; }
     public ObservableList<TimeTable>    getTimetableList()           { return timetableList; }
     public ObjectProperty<TimeTable>    activeTimetableProperty()    { return activeTimetable; }
     public StringProperty               activeTimetablePaneProperty(){ return activeTimetablePane; }
     public StringProperty               activePanelProperty()        { return activePanel; }
+    public StringProperty               activeTimelinePaneProperty() { return activeTimelinePane; }
 
     public LocalDate  getWeekStart()         { return weekStart.get(); }
     public LocalDate  getSelectedDay()       { return selectedDay.get(); }
     public boolean    isSidebarOpen()        { return sidebarOpen.get(); }
     public boolean    isFabExpanded()        { return fabExpanded.get(); }
+    public int        getDataRevision()      { return dataRevision.get(); }
     public TimeTable  getActiveTimetable()   { return activeTimetable.get(); }
     public String     getActivePanel()       { return activePanel.get(); }
+    public String     getActiveTimelinePane(){ return activeTimelinePane.get(); }
 
     /**
      * Keeps schedule-data.json stable even when the app is launched from an IDE

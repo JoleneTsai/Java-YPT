@@ -101,7 +101,9 @@ public class JsonScheduleRepository implements ScheduleRepository {
             Map<String, Object> object = castObject(item);
             tasks.add(new ToDoTask(
                 getString(object, "title"),
-                getBoolean(object, "completed")
+                getBoolean(object, "completed"),
+                parseLocalDate(getString(object, "date")),
+                parseLocalTime(getString(object, "startTime"))
             ));
         }
         return tasks;
@@ -199,7 +201,9 @@ public class JsonScheduleRepository implements ScheduleRepository {
             ToDoTask task = tasks.get(i);
             appendObjectStart(json, i);
             appendStringField(json, "title", task.getTitle(), true);
-            appendBooleanField(json, "completed", task.isCompleted(), false);
+            appendBooleanField(json, "completed", task.isCompleted(), true);
+            appendStringField(json, "date", format(task.getDate()), true);
+            appendStringField(json, "startTime", format(task.getStartTime()), false);
             appendObjectEnd(json, i, tasks.size());
         }
         if (!tasks.isEmpty()) {

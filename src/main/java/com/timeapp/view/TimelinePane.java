@@ -112,6 +112,16 @@ public class TimelinePane {
     // ?? Entry rendering ???????????????????????????????????????????????????????
 
     private void renderEntries(List<TimeEntry> entries) {
+        if (entries.isEmpty()) {
+            Label empty = new Label("No items for this date.");
+            empty.getStyleClass().add("timeline-empty-text");
+            empty.setUserData("timeline-entry");
+            empty.setLayoutX(GUTTER + 16);
+            empty.setLayoutY(PADDING + ROW_H * 2);
+            canvas.getChildren().add(empty);
+            return;
+        }
+
         for (TimeEntry entry : entries) {
             javafx.scene.Node node = switch (entry.getType()) {
                 case TODO            -> buildTodoNode((TodoEntry) entry);

@@ -1,6 +1,9 @@
 package com.timeapp.view;
 
 import com.timeapp.controller.DashboardController;
+import com.timeapp.view.calendar.CalendarPane;
+import com.timeapp.view.timeline.TimelineAddSchedulePane;
+import com.timeapp.view.timeline.TimelineAddTodoPane;
 import com.timeapp.view.timetable.TimetableMainPane;
 import javafx.animation.*;
 import javafx.geometry.*;
@@ -42,8 +45,12 @@ public class DashboardView {
     private final DashboardController ctrl;
 
     // Content sections
-    private BorderPane        timelineSection;
-    private TimetableMainPane timetableSection;
+    private StackPane              timelineSection;
+    private BorderPane             timelineMainPane;
+    private TimelineAddSchedulePane timelineAddSchedulePane;
+    private TimelineAddTodoPane     timelineAddTodoPane;
+    private CalendarPane           calendarSection;
+    private TimetableMainPane      timetableSection;
 
     public DashboardView() {
         ctrl = new DashboardController();
@@ -72,7 +79,11 @@ public class DashboardView {
         timetableSection.setVisible(false);
         timetableSection.setManaged(false);
 
-        contentStack.getChildren().addAll(timelineSection, timetableSection);
+        calendarSection = new CalendarPane(ctrl);
+        calendarSection.setVisible(false);
+        calendarSection.setManaged(false);
+
+        contentStack.getChildren().addAll(timelineSection, timetableSection, calendarSection);
         root.getChildren().add(contentStack);
 
         // ── [z=1]  Dim overlay ────────────────────────────────────────────────
@@ -112,9 +123,14 @@ public class DashboardView {
         AnchorPane.setRightAnchor(fabNode,  20.0);
         AnchorPane.setBottomAnchor(fabNode, 36.0);
 
-        // Hide FAB when timetable section is active (it has its own FAB)
-        ctrl.activePanelProperty().addListener((obs, o, panel) ->
-            fabNode.setVisible("TIMELINE".equals(panel)));
+        // Show the main FAB only on the Timeline main screen.
+        Runnable updateFabVisibility = () -> fabNode.setVisible(
+            "TIMELINE".equals(ctrl.getActivePanel())
+                && "MAIN".equals(ctrl.getActiveTimelinePane())
+        );
+        ctrl.activePanelProperty().addListener((obs, o, panel) -> updateFabVisibility.run());
+        ctrl.activeTimelinePaneProperty().addListener((obs, o, pane) -> updateFabVisibility.run());
+        updateFabVisibility.run();
 
         root.getChildren().add(fabNode);
 
@@ -128,7 +144,9 @@ public class DashboardView {
 
     // ── Timeline section ──────────────────────────────────────────────────────
 
-    private BorderPane buildTimelineSection() {
+    private StackPane buildTimelineSection() {
+        StackPane stack = new StackPane();
+
         BorderPane page = new BorderPane();
         page.getStyleClass().add("page");
 
@@ -138,7 +156,21 @@ public class DashboardView {
 
         TimelinePane timeline = new TimelinePane(390, ctrl.getDayEntries());
         page.setCenter(timeline.getNode());
-        return page;
+
+        timelineMainPane = page;
+        timelineAddSchedulePane = new TimelineAddSchedulePane(ctrl);
+        timelineAddTodoPane = new TimelineAddTodoPane(ctrl);
+
+        timelineAddSchedulePane.setVisible(false);
+        timelineAddSchedulePane.setManaged(false);
+        timelineAddTodoPane.setVisible(false);
+        timelineAddTodoPane.setManaged(false);
+
+        stack.getChildren().addAll(page, timelineAddSchedulePane, timelineAddTodoPane);
+        ctrl.activeTimelinePaneProperty().addListener((obs, oldPane, newPane) ->
+            animateTimelinePaneSwitch(oldPane, newPane));
+
+        return stack;
     }
 
     private HBox buildTopBar() {
@@ -179,6 +211,63 @@ public class DashboardView {
         return new WeekStripBar(ctrl).getNode();
     }
 
+    private void animateTimelinePaneSwitch(String leaving, String entering) {
+        Region enterNode = timelinePaneFor(entering);
+        Region leaveNode = timelinePaneFor(leaving);
+
+        if (enterNode == leaveNode) {
+            return;
+        }
+
+        enterNode.setVisible(true);
+        enterNode.setManaged(true);
+
+        if ("MAIN".equals(entering)) {
+            enterNode.setOpacity(1);
+            enterNode.setTranslateX(0);
+            Timeline tl = new Timeline(
+                new KeyFrame(Duration.millis(220),
+                    new KeyValue(leaveNode.opacityProperty(), 0, Interpolator.EASE_BOTH),
+                    new KeyValue(leaveNode.translateXProperty(), 32, Interpolator.EASE_BOTH)
+                )
+            );
+            tl.setOnFinished(e -> {
+                leaveNode.setVisible(false);
+                leaveNode.setManaged(false);
+                leaveNode.setOpacity(1);
+                leaveNode.setTranslateX(0);
+            });
+            tl.play();
+            return;
+        }
+
+        enterNode.setOpacity(0);
+        enterNode.setTranslateX(32);
+        Timeline tl = new Timeline(
+            new KeyFrame(Duration.millis(260),
+                new KeyValue(enterNode.opacityProperty(), 1, Interpolator.EASE_BOTH),
+                new KeyValue(enterNode.translateXProperty(), 0, Interpolator.EASE_BOTH)
+            )
+        );
+        tl.setOnFinished(e -> {
+            if (leaveNode != timelineMainPane) {
+                leaveNode.setVisible(false);
+                leaveNode.setManaged(false);
+            }
+            leaveNode.setOpacity(1);
+            leaveNode.setTranslateX(0);
+        });
+        tl.play();
+    }
+
+    private Region timelinePaneFor(String pane) {
+        return switch (pane) {
+            case "ADD_SCHEDULE" -> timelineAddSchedulePane;
+            case "ADD_TODO" -> timelineAddTodoPane;
+            default -> timelineMainPane;
+        };
+    }
+
     // ── Panel-switch animation ────────────────────────────────────────────────
 
     /**
@@ -190,8 +279,8 @@ public class DashboardView {
      * managed=false) so it receives no mouse events.
      */
     private void animatePanelSwitch(String leaving, String entering) {
-        Region enterNode = "TIMETABLE".equals(entering) ? timetableSection : timelineSection;
-        Region leaveNode = "TIMETABLE".equals(leaving)  ? timetableSection : timelineSection;
+        Region enterNode = topLevelPaneFor(entering);
+        Region leaveNode = topLevelPaneFor(leaving);
 
         if (enterNode == leaveNode) return;
 
@@ -214,5 +303,13 @@ public class DashboardView {
             leaveNode.setTranslateX(0);
         });
         tl.play();
+    }
+
+    private Region topLevelPaneFor(String panel) {
+        return switch (panel) {
+            case "TIMETABLE" -> timetableSection;
+            case "CALENDAR" -> calendarSection;
+            default -> timelineSection;
+        };
     }
 }

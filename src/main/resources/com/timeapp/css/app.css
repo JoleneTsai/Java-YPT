@@ -667,6 +667,20 @@
     -fx-border-color: transparent;
 }
 
+.tt-text-area {
+    -fx-background-color: #F2F2F7;
+    -fx-background-radius: 8;
+    -fx-border-color: transparent;
+    -fx-font-size: 13px;
+    -fx-text-fill: #333333;
+    -fx-prompt-text-fill: #8E8E93;
+}
+
+.tt-text-area .content {
+    -fx-background-color: #F2F2F7;
+    -fx-background-radius: 8;
+}
+
 .tt-date-picker {
     -fx-background-color: transparent;
     -fx-border-color: transparent;
@@ -855,4 +869,155 @@
     -fx-max-width:  48px;
     -fx-max-height: 48px;
     -fx-background-radius: 24;
+}
+
+/* ==========================================================================
+   CALENDAR PAGE
+   ========================================================================== */
+
+.calendar-page-body {
+    -fx-background-color: #FFFFFF;
+}
+
+.calendar-controls {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: transparent transparent #E5E5EA transparent;
+    -fx-border-width: 0 0 1 0;
+}
+
+.calendar-combo {
+    -fx-background-color: #F2F2F7;
+    -fx-background-radius: 8;
+    -fx-border-color: transparent;
+    -fx-font-size: 13px;
+    -fx-text-fill: #111111;
+}
+
+.calendar-combo .list-cell {
+    -fx-font-size: 13px;
+    -fx-padding: 6 10 6 10;
+}
+
+.calendar-combo .arrow-button {
+    -fx-background-color: transparent;
+}
+
+.calendar-combo .arrow {
+    -fx-background-color: #8E8E93;
+}
+
+.calendar-week-header {
+    -fx-padding: 4 0 0 0;
+}
+
+.calendar-week-label {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #8E8E93;
+}
+
+.calendar-grid {
+    -fx-background-color: #FFFFFF;
+}
+
+.calendar-day-cell {
+    -fx-background-color: #FAFAFA;
+    -fx-background-radius: 8;
+    -fx-border-color: #E5E5EA;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-cursor: hand;
+}
+
+.calendar-day-cell:hover {
+    -fx-background-color: #F2F2F7;
+}
+
+.calendar-day-outside {
+    -fx-opacity: 0.42;
+}
+
+.calendar-day-today {
+    -fx-border-color: #007AFF;
+}
+
+.calendar-day-selected {
+    -fx-background-color: #EAF3FF;
+    -fx-border-color: #007AFF;
+    -fx-border-width: 1.5;
+}
+
+.calendar-day-number {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #111111;
+}
+
+.calendar-todo-dot {
+    -fx-fill: #007AFF;
+}
+
+.calendar-detail-panel {
+    -fx-background-color: #FAFAFA;
+    -fx-background-radius: 8;
+    -fx-border-color: #E5E5EA;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-padding: 14;
+}
+
+.calendar-detail-title {
+    -fx-font-size: 15px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #111111;
+}
+
+.calendar-detail-list {
+    -fx-padding: 2 0 0 0;
+}
+
+.calendar-detail-row {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 8;
+    -fx-border-color: #E5E5EA;
+    -fx-border-radius: 8;
+    -fx-border-width: 1;
+    -fx-padding: 10 12 10 12;
+}
+
+.calendar-detail-row-todo {
+    -fx-border-color: #CFE4FF;
+}
+
+.calendar-detail-row-event {
+    -fx-border-color: #E1DAFF;
+}
+
+.calendar-detail-time {
+    -fx-font-size: 12px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #007AFF;
+}
+
+.calendar-detail-kind {
+    -fx-font-size: 11px;
+    -fx-text-fill: #8E8E93;
+}
+
+.calendar-detail-item-title {
+    -fx-font-size: 13px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #111111;
+}
+
+.calendar-empty-text {
+    -fx-font-size: 13px;
+    -fx-text-fill: #8E8E93;
+    -fx-padding: 10 2 8 2;
+}
+
+.timeline-empty-text {
+    -fx-font-size: 14px;
+    -fx-text-fill: #C7C7CC;
+    -fx-font-weight: bold;
 }
