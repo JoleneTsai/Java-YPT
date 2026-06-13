@@ -1,92 +1,212 @@
-# TimeFlow — Time Management App
+# Java-YPT Version 13
 
-A production-grade **JavaFX** mobile-style dashboard implementing a full-featured
-day-planner, course timetable, and calendar timeline.
-Targets a **390 × 844 px** viewport (iPhone 14 Pro equivalent) for desktop
-prototyping of a mobile UI.
+Java-YPT 是一個以 JavaFX 製作的讀書與時間規劃 App。主要功能包含每日 Timeline、Calendar、To-Do、課表 TimeTable，以及本機 JSON 資料儲存。Version 13 以 version-11 的 UI 架構為主，整合 version-12 中較完整的資料與課表改善，並修正 Timeline 疊加、To-Do 顯示、Schedule / To-Do 編輯刪除，以及 TimeTable 改名更新等問題。
 
 ---
 
-## Project Structure
+## 功能概述
 
-```
-TimeManagementApp/
-├── pom.xml                                         Maven build file
+- Timeline：顯示每日行程、課程與 To-Do。
+- Calendar：以月曆方式查看日期，並可進入單日行程列表。
+- TimeTable：建立課表、設定學期區間、加入課程。
+- To-Do：新增、顯示、編輯與刪除待辦事項。
+- JSON 儲存：Schedule、To-Do、TimeTable 的新增、修改與刪除會寫回本機資料檔。
+
+---
+
+## Version 13 更新重點
+
+- 修正同時間多個 Schedule 疊在一起時，舊行程看起來消失的問題。
+- Timeline 中同時間的 Schedule / class 會左右分欄顯示。
+- To-Do 改為小型 checkbox + 文字顯示，避免在 Timeline 中變成大色塊。
+- To-Do 預設顯示在最上層；點擊 Schedule 可暫時把 Schedule 移到上層，再次點擊可讓 To-Do 回到上層。
+- Calendar 單日列表中的 Schedule 可右鍵編輯或刪除。
+- Timeline 中的 Schedule / To-Do 可右鍵編輯或刪除。
+- 編輯 Schedule / To-Do 時會開啟原本新增頁面，並帶入原本資料。
+- TimeTable 改名後會即時更新列表與主畫面標題。
+- 新增完整 `timetables` JSON 格式，可儲存一整份課表。
+- `JsonScheduleRepository` 可讀取舊版 To-Do 欄位，也相容 version-12 的 To-Do 欄位。
+- `target/` 與本機 `schedule-data.json` 已加入 `.gitignore`，避免把編譯產物與個人資料推上 GitHub。
+
+---
+
+## 專案架構
+
+```text
+Java-YPT-version-13/
+├── pom.xml
+├── README.md
 └── src/main/
     ├── java/
-    │   ├── module-info.java                        JPMS module descriptor
+    │   ├── module-info.java
     │   └── com/timeapp/
-    │       ├── MainApp.java                        Entry point + FA font loader
-    │       │
-    │       ├── model/                              Pure data — no JavaFX UI imports
-    │       │   ├── TimeEntry.java                  Abstract base (start/end/title)
-    │       │   ├── TodoEntry.java                  Checkbox item + BooleanProperty
-    │       │   ├── CalendarEvent.java              Single-day event (location)
-    │       │   ├── TimetableClass.java             Daily timeline card (location + professor)
-    │       │   ├── TimeTable.java                  Semester container (title, date range, classes)
-    │       │   └── TimetableClassRecord.java       Course record with AccentColor + ClassTimeSlot
-    │       │
+    │       ├── MainApp.java
     │       ├── controller/
-    │       │   └── DashboardController.java        All state properties + action methods
-    │       │
-    │       ├── domain/                             Pure Java domain + persistence layer
+    │       │   └── DashboardController.java
+    │       ├── domain/
     │       │   ├── model/
-    │       │   │   ├── ScheduleData.java           Root JSON persistence object
-    │       │   │   ├── TimetableData.java          Persisted timetable container
-    │       │   │   ├── TimetableEntry.java         Persisted recurring class rule
-    │       │   │   ├── CalendarEvent.java          Persisted full-date calendar event
-    │       │   │   ├── ToDoTask.java               Persisted to-do task
-    │       │   │   ├── Schedulable.java            Timeline-compatible event interface
-    │       │   │   ├── EventType.java              CALENDAR / TIMETABLE
-    │       │   │   └── ExpandedTimetableEvent.java Concrete dated class occurrence
     │       │   ├── repository/
-    │       │   │   ├── ScheduleRepository.java     Storage abstraction
-    │       │   │   └── JsonScheduleRepository.java JSON load/save implementation
     │       │   └── service/
-    │       │       ├── ScheduleService.java         Data facade called by controller
-    │       │       ├── TimetableExpander.java       Recurring classes -> dated events
-    │       │       └── TimelineBuilder.java         Merge + sort timeline entries
-    │       │
+    │       ├── ui/
+    │       │   └── model/
     │       └── view/
-    │           ├── DashboardView.java              Root AnchorPane — layer stack + panel switching
-    │           ├── IconLabel.java                  FontAwesome glyph factory
-    │           ├── WeekStripBar.java               7-day selector + week navigation arrows
-    │           ├── TimelinePane.java               Scrollable hour grid + entry cards
-    │           ├── SidebarDrawer.java              Sliding navigation drawer (260 px)
-    │           ├── FabButton.java                  FAB + animated speed-dial
+    │           ├── calendar/
     │           └── timetable/
-    │               ├── TimetableMainPane.java      Panel 1 — week grid hub + sub-panel router
-    │               ├── TimetableAddClassPane.java  Panel 2 — add class form
-    │               ├── TimetableListPane.java      Panel 3 — semester list & selector
-    │               └── TimetableCreatePane.java    Panel 4 — create new semester form
-    │
-    └── resources/                                  ← Separated from Java source (this project)
+    └── resources/
         └── com/timeapp/
             ├── css/
-            │   └── app.css                         Full design system (858 lines)
             └── fonts/
-                └── fa-solid-900.ttf                FontAwesome 6 Free Solid
 ```
-
-> **Why resources are separate from Java source**
-> `src/main/resources/` is Maven's standard resource directory. Files placed here
-> are copied verbatim to the classpath root at build time, keeping UI assets
-> (fonts, stylesheets) cleanly separated from compiled `.class` files.
-> Java code accesses them at runtime via `getClass().getResource("/com/timeapp/...")`.
 
 ---
 
-## Running the App
+## 主要資料夾說明
 
-**Requirements:** Java 17+, Maven 3.8+
+### `controller`
+
+負責管理畫面狀態與使用者操作流程。
+
+主要檔案：
+
+- `DashboardController.java`
+
+處理目前選取日期、目前頁面、TimeTable 狀態、Schedule / To-Do / class 的新增、編輯、刪除，以及呼叫 service 儲存資料。
+
+### `domain/model`
+
+資料層的核心 model，定義會被儲存或處理的資料物件。
+
+- `ScheduleData.java`：整份 JSON 資料的根物件。
+- `CalendarEvent.java`：一般 Schedule 行程。
+- `ToDoTask.java`：待辦事項。
+- `TimetableEntry.java`：單筆課程資料。
+- `TimetableData.java`：完整課表物件，包含課表名稱、學期區間與課程清單。
+- `ExpandedTimetableEvent.java`：由課表展開後，顯示在特定日期 Timeline 上的課程。
+- `EventType.java`、`Schedulable.java`：Timeline 資料排序與顯示用的共用型別。
+
+### `domain/repository`
+
+資料儲存層，負責把 Java 物件與 JSON 檔案互相轉換。
+
+- `ScheduleRepository.java`：儲存介面。
+- `JsonScheduleRepository.java`：JSON 讀取與寫入實作。
+
+### `domain/service`
+
+連接 controller 與資料層的服務層。
+
+- `ScheduleService.java`：提供新增、更新、刪除、儲存資料的方法。
+- `TimetableExpander.java`：將每週課表依照日期展開成 Timeline 可顯示的課程。
+- `TimelineBuilder.java`：整合 Schedule 與課表事件，並依時間排序。
+
+### `ui/model`
+
+畫面顯示用的 JavaFX model，包含 `Property`，方便 UI 綁定與即時更新。
+
+- `TimeEntry.java`
+- `CalendarEvent.java`
+- `TodoEntry.java`
+- `TimetableClass.java`
+- `TimetableClassRecord.java`
+- `TimeTable.java`
+
+### `view`
+
+JavaFX 畫面元件。
+
+- `DashboardView.java`：主畫面與頁面切換。
+- `TimelinePane.java`：每日 Timeline 顯示、重疊行程排版、右鍵選單。
+- `AddSchedulePane.java`：新增 / 編輯 Schedule。
+- `AddTodoPane.java`：新增 / 編輯 To-Do。
+- `calendar/`：Calendar 月曆與單日列表。
+- `timetable/`：TimeTable 主畫面、新增課程、課表列表、新增課表。
+
+---
+
+## 資料儲存流程
+
+```text
+UI / Controller
+      ↓
+ScheduleService
+      ↓
+ScheduleRepository
+      ↓
+JsonScheduleRepository
+      ↓
+schedule-data.json
+```
+
+說明：
+
+- UI 操作後會由 `DashboardController` 處理。
+- `DashboardController` 呼叫 `ScheduleService`。
+- `ScheduleService` 再呼叫 repository 儲存。
+- `JsonScheduleRepository` 負責把資料寫入 `schedule-data.json`。
+
+---
+
+## JSON 資料格式
+
+Version 13 的資料根物件為 `ScheduleData`，包含四個主要區塊：
+
+```jsonc
+{
+  "calendarEvents": [],
+  "todoTasks": [],
+  "timetableEntries": [],
+  "timetables": []
+}
+```
+
+### 新增重點：`timetables`
+
+Version 13 新增 `timetables`，讓系統可以儲存一整份課表，而不是只儲存單筆課程。
+
+```jsonc
+"timetables": [
+  {
+    "id": "...",
+    "title": "113-2",
+    "startDate": "2026-02-23",
+    "endDate": "2026-06-26",
+    "classes": [
+      {
+        "title": "Algorithm",
+        "dayOfWeek": "FRIDAY",
+        "startTime": "13:00",
+        "endTime": "15:00",
+        "room": "Room 65304",
+        "teacher": "Prof. Lee"
+      }
+    ]
+  }
+]
+```
+
+`timetables` 的用途：
+
+- `id`：課表唯一識別碼。
+- `title`：課表名稱。
+- `startDate` / `endDate`：學期或課表有效區間。
+- `classes`：這份課表中的所有課程。
+
+---
+
+## 執行方式
+
+需求：
+
+- Java 17+
+- Maven 3.8+
+
+執行 App：
 
 ```bash
-cd TimeManagementApp
 mvn javafx:run
 ```
 
-**Fallback** (if `mvn javafx:run` fails — e.g. older Maven without `org.openjfx`
-in plugin groups):
+如果 `mvn javafx:run` 無法執行，可嘗試：
 
 ```bash
 mvn compile exec:java
@@ -94,439 +214,52 @@ mvn compile exec:java
 
 ---
 
-## Architecture: Layer Stack
+## 驗證方式
 
-`DashboardView` composes the entire screen as a single `AnchorPane` with four
-z-ordered layers:
-
-```
-AnchorPane  root  (390 × 844)
-│
-├─ [z=0]  StackPane  contentStack          ← swaps between the two top-level sections
-│          ├─ BorderPane  timelineSection  ← default view
-│          │    ├─ TOP:     VBox
-│          │    │            ├─ TopBar (HBox) — [☰] · date · [↻]
-│          │    │            └─ WeekStrip (HBox) — ‹ SUN MON … SAT ›
-│          │    └─ CENTER:  TimelinePane (ScrollPane → AnchorPane canvas)
-│          │                    ├─ Hour labels + divider lines
-│          │                    └─ TimeEntry cards (positioned by timeToY() math)
-│          │
-│          └─ AnchorPane  TimetableMainPane   ← shown when navigating to "TimeTable"
-│               ├─ BorderPane  mainContent    ← always visible
-│               │    ├─ TOP:    VBox (top-bar + SUN/MON…SAT week header)
-│               │    └─ CENTER: ScrollPane (week schedule grid with class cards)
-│               ├─ StackPane  subStack        ← sub-panel overlay layer
-│               │    ├─ TimetableAddClassPane  (Panel 2, slides in from right)
-│               │    ├─ TimetableListPane      (Panel 3, slides in from right)
-│               │    └─ TimetableCreatePane    (Panel 4, slides in from right)
-│               └─ VBox  timetableFab          ← own speed-dial FAB
-│
-├─ [z=1]  Rectangle  dimOverlay              ← 35 % black, shown when drawer is open
-│
-├─ [z=2]  VBox  SidebarDrawer                ← slides in/out: translateX −260 ↔ 0
-│          ├─ Avatar + "TimeFlow" header
-│          ├─ Nav items: TimeLine · TimeTable · Calendar
-│          └─ Bottom bar: ⚙ · ℹ · version
-│
-└─ [z=3]  VBox  FabButton                    ← anchored bottom-right (Timeline only)
-           ├─ [mini] "Add Schedule"
-           ├─ [mini] "Add To-do"
-           └─ [main] "+" circular FAB
-```
-
----
-
-## Architecture: Controller State Flow
-
-`DashboardController` is the single source of truth.
-Views observe its `Property<>` fields and never mutate shared state directly.
-
-```
-User action          Controller method          Property changes         View reaction
-───────────────────  ─────────────────────────  ──────────────────────  ──────────────────────────────────
-Tap ☰                toggleSidebar()            sidebarOpen = true      SidebarDrawer slides in (280 ms)
-Tap dim overlay      closeSidebar()             sidebarOpen = false     SidebarDrawer slides out
-Tap day cell         selectDay(d)               selectedDay = d         WeekStrip highlights · Timeline reloads
-Tap ↻                backToToday()              selectedDay = today     + weekStart resets to this week
-Tap FAB +            toggleFab()                fabExpanded = true      Mini-FABs animate in
-Tap "TimeTable" nav  navigateTo("TimeTable")    activePanel = TIMETABLE cross-fade to TimetableMainPane
-Tap "TimeLine" nav   navigateTo("TimeLine")     activePanel = TIMELINE  cross-fade back to TimelinePane
-Tap "Add Class" FAB  showAddClassPane()         activeTimetablePane=ADD Panel 2 slides in from right
-Tap back arrow (P2)  backToTimetableMain()      activeTimetablePane=MAIN Panel 2 slides out
-Tap save (P2)        saveClass(record)          classes list grows      Timeline re-renders + JSON saves
-Tap "TimeTable" FAB  showTimetableList()        activeTimetablePane=LIST Panel 3 slides in
-Tap row (P3)         setActiveTimetable(tt)     activeTimetable = tt    Panel 3 circle indicators rebuild
-Tap mini-FAB (P3)    showCreateTimetable()      activeTimetablePane=CREATE Panel 4 slides in
-Tap save (P4)        saveNewTimetable(…)        timetableList grows     Panel 3 rebuilds · JSON saves
-```
-
----
-
-## Architecture: Timetable Panel Navigation
-
-The four panels form a linear navigation stack managed by
-`ctrl.activeTimetablePaneProperty()` (`"MAIN"` → `"ADD"` / `"LIST"` → `"CREATE"`).
-
-```
-Panel 1 — TimetableMainPane   (always-visible base)
-│   FAB → "Add Class"    ──────────────────────────► Panel 2 — TimetableAddClassPane
-│                                                        [✓ Save]  → ctrl.saveClass()  → service.saveData()
-│                                                        [‹ Back]  → back to Panel 1
-│
-│   FAB → "TimeTable"    ──────────────────────────► Panel 3 — TimetableListPane
-│                                                        Tap row   → ctrl.setActiveTimetable()
-│                                                        [‹ Back]  → back to Panel 1
-│                                                        Mini-FAB  ────────────────────► Panel 4 — TimetableCreatePane
-│                                                                                            [✓ Save] → ctrl.saveNewTimetable() → service.saveData()
-│                                                                                            [‹ Back] → back to Panel 3
-```
-
-All transitions use a horizontal `translateX` slide animation (280 ms, `EASE_BOTH`).
-Panels are `visible=false` + `managed=false` when off-screen so they receive no mouse events.
-
----
-
-## Architecture: Timeline Filtering (Semester Date Gate)
-
-`DashboardController.addActiveTimetableClasses()` enforces that recurring class
-entries from the active timetable only appear in the Timeline when:
-
-1. A `ClassTimeSlot.dayOfWeek` matches the queried date's day-of-week.
-2. The queried date falls within `[activeTimetable.startDate, activeTimetable.endDate]`.
-
-```java
-// Inside DashboardController
-private void addActiveTimetableClasses(List<TimeEntry> list, LocalDate date) {
-    TimeTable tt = activeTimetable.get();
-    if (tt == null || !tt.isDateInRange(date)) return;   // ← semester gate
-    for (TimetableClassRecord rec : tt.getClasses()) {
-        for (ClassTimeSlot slot : rec.getTimeSlots()) {
-            if (slot.getDayOfWeek() == date.getDayOfWeek()) {
-                list.add(new TimetableClass(...));
-            }
-        }
-    }
-}
-```
-
-This means that once a semester's end date passes, its classes silently stop
-appearing in the daily timeline with no additional code required.
-
----
-
-## Design System (app.css)
-
-### Colour Palette
-
-| Token           | Value       | Usage                                    |
-|-----------------|-------------|------------------------------------------|
-| Background      | `#FFFFFF`   | App root, timeline canvas, cards         |
-| Surface         | `#FAFAFA`   | Week strip, sidebar background           |
-| Surface-high    | `#F2F2F7`   | Hover states, combo boxes                |
-| Border          | `#E5E5EA`   | Dividers, card outlines, separators      |
-| Text Primary    | `#111111`   | Headings, card titles, active labels     |
-| Text Secondary  | `#8E8E93`   | Hour labels, day names, muted text       |
-| Text Tertiary   | `#C7C7CC`   | Placeholders, empty-state hints          |
-| Accent Blue     | `#007AFF`   | Active day, active nav, save button      |
-| Accent Red      | `#FF3B30`   | To-do checkbox border, today circle      |
-| Accent Purple   | `#5856D6`   | Timetable class cards (strip)            |
-| Accent Teal     | `#30D5C8`   | Timetable card option                    |
-| Accent Green    | `#34C759`   | Timetable card option                    |
-| Accent Orange   | `#FF9F0A`   | Timetable card option                    |
-
-### Icon Font System
-
-All icons use **FontAwesome 6 Free Solid** (`fa-solid-900.ttf`).
-The font is registered in `MainApp.java` via `Font.loadFont(getResourceAsStream(...), 10)`
-**before** the Scene is created, ensuring it is available when CSS is parsed.
-
-Icons are created exclusively through `IconLabel.of(codepoint, sizePx, styleClass)`,
-which applies the font via **inline style** (`node.setStyle("-fx-font-family: '...'")`).
-This is necessary because CSS cascade (priority 2) overrides `Font.font()` bean
-properties (priority 4), but inline style (priority 1) always wins.
-
-```java
-// Example: create a 18px hamburger icon with colour controlled by CSS
-Label icon = IconLabel.of(IconLabel.BARS, 18, "topbar-icon");
-button.setGraphic(icon);
-// Colour is set in app.css: .topbar-icon { -fx-text-fill: #333333; }
-```
-
-### Key Icon Codepoints (all verified in fa-solid-900.ttf)
-
-| Constant          | Unicode    | Icon         | Used in                         |
-|-------------------|------------|--------------|----------------------------------|
-| `BARS`            | `\uf0c9`  | ☰ hamburger  | Top-bar menu button              |
-| `CLOCK`           | `\uf017`  | 🕐 clock     | TimeLine sidebar nav item        |
-| `TABLE`           | `\uf0ce`  | 🗃 table     | TimeTable sidebar nav item       |
-| `CALENDAR`        | `\uf133`  | 📅 calendar  | Calendar sidebar nav item        |
-| `COG`             | `\uf013`  | ⚙ gear       | Sidebar bottom bar               |
-| `INFO_CIRCLE`     | `\uf129`  | ℹ info       | Sidebar bottom bar               |
-| `PLUS`            | `\uf067`  | + plus       | FAB main, "Add Class" mini       |
-| `ROTATE_RIGHT`    | `\uf01e`  | ↻ rotate     | "Back to Today" top-bar button   |
-| `CALENDAR_CHECK`  | `\uf274`  | ✓ cal-check  | "Add Schedule" FAB mini          |
-| `CIRCLE_CHECK`    | `\uf058`  | ✅ check      | "Add To-do" FAB mini             |
-| `XMARK`           | `\uf00d`  | ✕ close      | FAB main when speed-dial is open |
-| `CHEVRON_LEFT`    | `\uf053`  | ‹ back       | Panel 2/3/4 header back button   |
-| `CHECK`           | `\uf00c`  | ✓ check      | Panel 2/4 header save button     |
-
----
-
-## Model Reference
-
-### TimeEntry hierarchy (Timeline items)
-
-```
-TimeEntry  (abstract — start, end, title)
-├── TodoEntry           BooleanProperty completed
-├── CalendarEvent       String location
-└── TimetableClass      String location, professor
-```
-
-### TimetableClassRecord (Timetable domain)
-
-```
-TimetableClassRecord
-├── String subject, teacher, classroom
-├── AccentColor  (PURPLE | BLUE | TEAL | GREEN | ORANGE | RED | PINK)
-│                  each has .strip (hex) + .bg (hex) for card colouring
-└── ObservableList<ClassTimeSlot>
-         └── ClassTimeSlot  (DayOfWeek day, LocalTime start, LocalTime end)
-```
-
-### TimeTable (Semester container)
-
-```
-TimeTable
-├── String id  (UUID)
-├── StringProperty title
-├── ObjectProperty<LocalDate> startDate
-├── ObjectProperty<LocalDate> endDate
-├── boolean isDateInRange(LocalDate)   ← used by Timeline filtering
-└── ObservableList<TimetableClassRecord> classes
-```
-
-### Persistence model (domain)
-
-The UI model and persistence model are intentionally separate:
-
-| Layer | Class | Purpose |
-|---|---|---|
-| UI | `com.timeapp.model.TimeTable` | JavaFX observable semester object used by views |
-| UI | `com.timeapp.model.TimetableClassRecord` | JavaFX observable class form/list object |
-| Domain | `com.timeapp.domain.model.TimetableData` | Plain Java timetable container saved to JSON |
-| Domain | `com.timeapp.domain.model.TimetableEntry` | Plain Java recurring class rule saved to JSON |
-
-`DashboardController` converts between UI objects and domain objects when
-loading or saving. This keeps JavaFX `Property<>` objects out of the JSON layer.
-
-```
-ScheduleData
-├── List<CalendarEvent> calendarEvents
-├── List<ToDoTask> todoTasks
-├── List<TimetableEntry> timetableEntries   (legacy-compatible list)
-└── List<TimetableData> timetables          (full timetable persistence)
-
-TimetableData
-├── String id
-├── String title
-├── LocalDate startDate
-├── LocalDate endDate
-└── List<TimetableEntry> classes
-```
-
----
-
-## Persistence: JSON Storage
-
-`DashboardController` owns a `ScheduleService` wired to:
-
-```java
-new JsonScheduleRepository("schedule-data.json")
-```
-
-Save class flow:
-
-```
-UI Save Class
-→ DashboardController.saveClass(record)
-→ ScheduleService.addClassToTimetable(timetableId, entry)
-→ ScheduleService.saveData()
-→ JsonScheduleRepository.saveAll(data)
-→ schedule-data.json
-```
-
-Save timetable flow:
-
-```
-UI Save TimeTable
-→ DashboardController.saveNewTimetable(title, start, end)
-→ ScheduleService.addTimetable(timetableData)
-→ JsonScheduleRepository.saveAll(data)
-→ schedule-data.json
-```
-
-Startup flow:
-
-```
-DashboardController()
-→ ScheduleService.loadData()
-→ JsonScheduleRepository.loadAll()
-→ ScheduleData.timetables
-→ converted back to UI TimeTable / TimetableClassRecord
-```
-
-### Current JSON shape
-
-```json
-{
-  "calendarEvents": [],
-  "todoTasks": [],
-  "timetableEntries": [],
-  "timetables": [
-    {
-      "id": "semester-113-2",
-      "title": "113-2 Semester",
-      "startDate": "2026-02-17",
-      "endDate": "2026-06-20",
-      "classes": [
-        {
-          "title": "Linear Algebra",
-          "dayOfWeek": "WEDNESDAY",
-          "startTime": "10:00",
-          "endTime": "12:00",
-          "room": "A101",
-          "teacher": "Prof. Lee",
-          "color": "#4A9EFF",
-          "tag": "課程",
-          "semesterStart": "2026-02-17",
-          "semesterEnd": "2026-06-20"
-        }
-      ]
-    }
-  ]
-}
-```
-
-### Backward compatibility
-
-Older JSON files may only contain `timetableEntries`. The controller can still
-load those entries, group them into a saved timetable, and persist them back
-through the new `timetables` structure. Timeline expansion uses
-`timetables[].classes` first, and only falls back to legacy `timetableEntries`
-when no full timetable data exists.
-
-### Verified in version 8
-
-- Domain layer compiles with `javac`.
-- `JsonScheduleRepository.saveAll()` writes the new `timetables` JSON structure.
-- `JsonScheduleRepository.loadAll()` reads the new structure back.
-- A saved timetable preserves `title`, `startDate`, `endDate`, and `classes`.
-- `git diff --check` passes.
-
-### Still needs full app verification
-
-This environment does not have Maven / JavaFX dependencies installed, so full
-JavaFX startup was not verified here. On a machine with Maven, run:
+編譯：
 
 ```bash
-mvn compile
-mvn javafx:run
+mvn -q -DskipTests compile
 ```
 
-Manual UI checks:
+測試：
 
-- Create an empty TimeTable, restart, and confirm it still appears.
-- Add a class, restart, and confirm the TimeTable title/date/classes remain.
-- Confirm `schedule-data.json` updates after saving TimeTable/Class.
-- Confirm legacy `timetableEntries` data still loads if present.
-- Confirm existing timetable grid and timeline rendering still work.
+```bash
+mvn -q test
+```
+
+檢查 Git diff 是否有多餘空白或格式問題：
+
+```bash
+git diff --check
+```
+
+Version 13 已驗證：
+
+- `mvn -q -DskipTests compile`
+- `mvn -q test`
+- `git diff --check`
 
 ---
 
-## Timeline Layout Math
+## Git 注意事項
 
-```
-GUTTER   = 56 px    left column width (hour labels)
-ROW_H    = 64 px    pixels per 60 minutes
-PADDING  =  8 px    top offset before first hour label
-START_H  =  7       first hour shown (07:00)
+本版本已將以下內容加入 `.gitignore`：
 
-timeToY(LocalTime t) = PADDING + (t.hour + t.minute/60 − START_H) × ROW_H
-minutesToPx(m)       = m / 60.0 × ROW_H
-card min-height      = 44 px   (ensures short events remain readable)
+```text
+target/
+schedule-data.json
 ```
+
+原因：
+
+- `target/` 是 Maven 編譯產物，不需要上傳。
+- `schedule-data.json` 是本機執行資料，可能包含個人測試內容，不建議直接推到 GitHub。
 
 ---
 
-## Timetable Schedule Grid Math
+## 待確認項目
 
-```
-GUTTER  = 56 px    (same as Timeline — time label column)
-ROW_H   = 56 px    (pixels per 60 minutes in the week grid)
-COL_W   = (390 − 56) / 7 ≈ 47.7 px   (one day column)
-START_H =  7       (grid starts at 07:00)
-
-cardX = 56 + dayOfWeek.getValue() % 7 × COL_W + 2
-cardY = (slot.startHour − START_H + slot.startMinute/60) × ROW_H + 8
-cardH = (endHour − startHour + minuteDiff/60) × ROW_H − 4   (min 32 px)
-```
-
----
-
-## Extending the App
-
-### Add a class programmatically
-
-```java
-TimetableClassRecord rec = TimetableClassRecord.of(
-    "Computer Networks", "Prof. Lin", "Lab A1",
-    TimetableClassRecord.AccentColor.TEAL,
-    DayOfWeek.TUESDAY, LocalTime.of(10, 0), LocalTime.of(11, 30));
-
-ctrl.saveClass(rec);
-// Controller appends to activeTimetable.getClasses(),
-// calls loadEntriesForDay() to refresh the Timeline,
-// and navigates back to Panel 1 automatically.
-```
-
-### Create a new semester
-
-```java
-ctrl.saveNewTimetable("114-1 Semester Fall",
-    LocalDate.of(2025, 9, 1),
-    LocalDate.of(2026, 1, 16));
-// Controller creates a TimeTable, adds it to timetableList,
-// sets it as active, and navigates to Panel 3 to confirm.
-```
-
-### Add swipe navigation to WeekStrip
-
-```java
-// In WeekStripBar.java, add to the root HBox after construction:
-root.setOnSwipeLeft(e  -> ctrl.nextWeek());
-root.setOnSwipeRight(e -> ctrl.prevWeek());
-```
-
-### Navigate to Calendar section
-
-```java
-// In DashboardController.navigateTo(), add:
-case "Calendar" -> {
-    activePanel.set("CALENDAR");
-    // then build and show CalendarView in DashboardView's contentStack
-}
-```
-
----
-
-## Known Compile-Time Fixes (applied in this codebase)
-
-| File | Issue | Fix |
-|---|---|---|
-| `TimetableMainPane.java` | `btnAddClass` used in lambda before its declaration | Both buttons declared **before** any lambda that references them |
-| `TimetableAddClassPane.java` | `DateTimeFormatter` not found in inner class | Added `import java.time.format.DateTimeFormatter;` explicitly (`java.time.*` does not cover sub-packages) |
-| `TimetableAddClassPane.java` | `node might not have been initialized` | `private HBox node = null;` — explicit null initialiser |
-| `TimetableListPane.java` | `ListChangeListener` not found | Added `import javafx.collections.ListChangeListener;` |
-| `IconLabel.java` | CSS cascade overrides `Font.font()` bean property | Font set via `node.setStyle(…)` (inline style, priority 1) instead of `Font.font()` alone (bean property, priority 4) |
-| `pom.xml` | `No plugin found for prefix 'javafx'` | Added `<pluginManagement>` to register `org.openjfx` prefix; `exec-maven-plugin` fallback also included |
+- JavaFX UI 需要實際執行確認互動細節，例如右鍵選單、Timeline 點擊圖層切換、編輯頁資料帶入。
+- 不同組員的 service / UI 整合後，仍需確認是否都有呼叫 `ScheduleService` 的儲存方法。
+- 若未來要多人共用同一份資料格式，需要確認 `schedule-data.json` 的欄位命名是否完全一致。
