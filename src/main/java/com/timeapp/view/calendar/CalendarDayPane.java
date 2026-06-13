@@ -176,6 +176,17 @@ public class CalendarDayPane extends VBox {
         row.getChildren().addAll(timeLbl, lineWrapper, content);
         row.setOnMouseEntered(e -> row.getStyleClass().add("calendar-day-event-row-hover"));
         row.setOnMouseExited(e  -> row.getStyleClass().remove("calendar-day-event-row-hover"));
+
+        MenuItem editItem = new MenuItem("Edit Schedule");
+        editItem.setOnAction(e -> ctrl.editSchedule(event));
+        MenuItem deleteItem = new MenuItem("Delete Schedule");
+        deleteItem.setOnAction(e -> ctrl.deleteSchedule(event));
+        ContextMenu menu = new ContextMenu(editItem, deleteItem);
+        row.setOnContextMenuRequested(e -> {
+            menu.show(row, e.getScreenX(), e.getScreenY());
+            e.consume();
+        });
+
         return row;
     }
 }

@@ -215,23 +215,20 @@
 
 /* ── To-do Row ────────────────────────────────────────────────────────────── */
 .todo-row {
-    -fx-background-color: #FFFFFF;
-    -fx-background-radius: 12;
-    -fx-padding: 12 16 12 16;
-    -fx-border-color: #E5E5EA;
-    -fx-border-radius: 12;
-    -fx-border-width: 1;
+    -fx-background-color: transparent;
+    -fx-padding: 2 4 2 4;
+    -fx-spacing: 6;
     -fx-cursor: hand;
-    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.02), 4, 0, 0, 2);
+    -fx-alignment: center-left;
 }
 
 .todo-row:hover {
-    -fx-background-color: #FAFAFA;
-    -fx-border-color: #C7C7CC;
+    -fx-background-color: rgba(255,255,255,0.72);
+    -fx-background-radius: 7;
 }
 
 .todo-title {
-    -fx-font-size: 14px;
+    -fx-font-size: 13px;
     -fx-text-fill: #111111;
     -fx-font-weight: normal;
 }
@@ -243,21 +240,23 @@
 
 .todo-checkbox .box {
     -fx-background-color: #FFFFFF;
-    -fx-border-color: #dd564f;
-    -fx-border-radius: 6;
-    -fx-background-radius: 6;
-    -fx-border-width: 1.5;
-    -fx-min-width: 20px;
-    -fx-min-height: 20px;
+    -fx-border-color: #C7C7CC;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-border-width: 1.2;
+    -fx-min-width: 15px;
+    -fx-min-height: 15px;
+    -fx-max-width: 15px;
+    -fx-max-height: 15px;
 }
 
 .todo-checkbox:selected .box {
-    -fx-background-color: #dd564f;
-    -fx-border-color: #dd564f;
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #8E8E93;
 }
 
 .todo-checkbox:selected .mark {
-    -fx-background-color: white;
+    -fx-background-color: #111111;
 }
 
 /* ── Event Cards ──────────────────────────────────────────────────────────── */

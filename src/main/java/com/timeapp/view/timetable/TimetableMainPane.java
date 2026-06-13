@@ -133,8 +133,13 @@ public class TimetableMainPane extends AnchorPane {
         nameLbl.setAlignment(Pos.CENTER_LEFT);
 
         Runnable updateName = () -> {
+            nameLbl.textProperty().unbind();
             TimeTable tt = ctrl.getActiveTimetable();
-            nameLbl.setText(tt != null ? tt.getTitle() : "No Timetable");
+            if (tt != null) {
+                nameLbl.textProperty().bind(tt.titleProperty());
+            } else {
+                nameLbl.setText("No Timetable");
+            }
         };
         updateName.run();
         ctrl.activeTimetableProperty().addListener((obs, o, n) -> updateName.run());

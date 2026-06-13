@@ -31,6 +31,9 @@ public class AddTodoPane extends VBox {
     private final ComboBox<LocalTime> timeBox    = buildTimeCombo();
 
     private final Label titleError = errorLabel();
+    private final Label headerTitle = new Label("Add To-Do");
+    private final Button deleteBtn = new Button("Delete To-Do");
+    private ToDoTask editingTask;
 
     public AddTodoPane(DashboardController ctrl) {
         this.ctrl = ctrl;
@@ -43,7 +46,12 @@ public class AddTodoPane extends VBox {
 
         ctrl.overlayPaneProperty().addListener((obs, from, to) -> {
             if ("ADD_TODO".equals(to)) {
-                resetForm(ctrl.getPendingAddDate());
+                ToDoTask task = ctrl.getEditingTodoTask();
+                if (task != null) {
+                    loadEditForm(task);
+                } else {
+                    resetForm(ctrl.getPendingAddDate());
+                }
             }
         });
     }
@@ -64,11 +72,10 @@ public class AddTodoPane extends VBox {
         backBtn.setOnAction(e -> ctrl.closeOverlay());
         Tooltip.install(backBtn, new Tooltip("Cancel"));
 
-        Label title = new Label("Add To-Do");
-        title.getStyleClass().add("tt-panel-title");
-        HBox.setHgrow(title, Priority.ALWAYS);
-        title.setAlignment(Pos.CENTER);
-        title.setMaxWidth(Double.MAX_VALUE);
+        headerTitle.getStyleClass().add("tt-panel-title");
+        HBox.setHgrow(headerTitle, Priority.ALWAYS);
+        headerTitle.setAlignment(Pos.CENTER);
+        headerTitle.setMaxWidth(Double.MAX_VALUE);
 
         Label checkIcon = IconLabel.of(IconLabel.CHECK, 16, "tt-save-icon");
         Button saveBtn  = new Button();
@@ -78,7 +85,7 @@ public class AddTodoPane extends VBox {
         saveBtn.setOnAction(e -> onSave());
         Tooltip.install(saveBtn, new Tooltip("Save"));
 
-        bar.getChildren().addAll(backBtn, title, saveBtn);
+        bar.getChildren().addAll(backBtn, headerTitle, saveBtn);
         return bar;
     }
 
@@ -96,8 +103,19 @@ public class AddTodoPane extends VBox {
             dateRow("Date",      datePicker),
             sep(),
             comboRow("Time slot", timeBox),
-            sep()
+            sep(),
+            deleteBtn
         );
+
+        deleteBtn.getStyleClass().add("tt-add-time-btn");
+        deleteBtn.setMaxWidth(Double.MAX_VALUE);
+        deleteBtn.setVisible(false);
+        deleteBtn.setManaged(false);
+        deleteBtn.setOnAction(e -> {
+            if (editingTask != null) {
+                ctrl.deleteTodo(editingTask);
+            }
+        });
 
         return form;
     }
@@ -120,15 +138,39 @@ public class AddTodoPane extends VBox {
         LocalTime t = timeBox.getValue();
         if (d != null && t != null) task.setScheduled(d, t);
 
-        ctrl.saveTodo(task);
+        if (editingTask != null) {
+            ctrl.updateTodo(editingTask, task);
+        } else {
+            ctrl.saveTodo(task);
+        }
     }
 
     // ── Reset ─────────────────────────────────────────────────────────────────
 
     public void resetForm(LocalDate defaultDate) {
+        editingTask = null;
+        headerTitle.setText("Add To-Do");
         titleField.clear();
         datePicker.setValue(defaultDate != null ? defaultDate : LocalDate.now());
         timeBox.setValue(LocalTime.of(9, 0));
+        deleteBtn.setVisible(false);
+        deleteBtn.setManaged(false);
+        hide(titleError);
+        titleField.getStyleClass().remove("tt-field-error");
+    }
+
+    private void loadEditForm(ToDoTask task) {
+        editingTask = task;
+        headerTitle.setText("Edit To-Do");
+        titleField.setText(task.getTitle() != null ? task.getTitle() : "");
+        datePicker.setValue(task.getScheduledLocalDate() != null
+            ? task.getScheduledLocalDate()
+            : ctrl.getSelectedDay());
+        timeBox.setValue(task.getScheduledLocalTime() != null
+            ? task.getScheduledLocalTime()
+            : LocalTime.of(9, 0));
+        deleteBtn.setVisible(true);
+        deleteBtn.setManaged(true);
         hide(titleError);
         titleField.getStyleClass().remove("tt-field-error");
     }

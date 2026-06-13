@@ -62,6 +62,10 @@ public class DashboardController {
     private final ObservableList<TimeEntry> dayEntries =
             FXCollections.observableArrayList();
 
+    /** Bumped whenever persisted data changes so views can refresh summaries. */
+    private final IntegerProperty dataRevision =
+            new SimpleIntegerProperty(0);
+
     // ?? Timetable domain state ????????????????????????????????????????????????
 
     /** All semester timetables created in the UI. */
@@ -117,6 +121,8 @@ public class DashboardController {
 
     /** The default date pre-filled in overlay forms when they open. */
     private java.time.LocalDate pendingAddDate = java.time.LocalDate.now();
+    private com.timeapp.domain.model.CalendarEvent editingScheduleEvent;
+    private com.timeapp.domain.model.ToDoTask editingTodoTask;
 
     // ?? Formatters ????????????????????????????????????????????????????????????
 
@@ -185,12 +191,14 @@ public class DashboardController {
 
     public void onAddSchedule() {
         collapseFab();
+        editingScheduleEvent = null;
         pendingAddDate = selectedDay.get();
         overlayPane.set("ADD_SCHEDULE");
     }
 
     public void onAddTodo() {
         collapseFab();
+        editingTodoTask = null;
         pendingAddDate = selectedDay.get();
         overlayPane.set("ADD_TODO");
     }
@@ -266,6 +274,7 @@ public class DashboardController {
 
         dialog.showAndWait().ifPresent(event -> {
             scheduleService.addCalendarEvent(event);
+            bumpDataRevision();
             loadEntriesForDay(selectedDay.get());
             // Refresh calendar month grid dots and day list immediately
             refreshCalendarViews();
@@ -317,6 +326,7 @@ public class DashboardController {
 
         dialog.showAndWait().ifPresent(task -> {
             scheduleService.addToDoTask(task);
+            bumpDataRevision();
             loadEntriesForDay(selectedDay.get());
         });
     }
@@ -358,6 +368,37 @@ public class DashboardController {
      */
     public void saveSchedule(com.timeapp.domain.model.CalendarEvent event) {
         scheduleService.addCalendarEvent(event);
+        bumpDataRevision();
+        focusScheduleDate(event);
+        loadEntriesForDay(selectedDay.get());
+        refreshCalendarViews();
+        closeOverlay();
+    }
+
+    public void updateSchedule(com.timeapp.domain.model.CalendarEvent target,
+                               com.timeapp.domain.model.CalendarEvent replacement) {
+        scheduleService.updateCalendarEvent(target, replacement);
+        bumpDataRevision();
+        focusScheduleDate(target);
+        loadEntriesForDay(selectedDay.get());
+        refreshCalendarViews();
+        closeOverlay();
+    }
+
+    public void editSchedule(com.timeapp.domain.model.CalendarEvent event) {
+        if (event == null) return;
+        editingScheduleEvent = event;
+        editingTodoTask = null;
+        if (event.getStartTime() != null) {
+            pendingAddDate = event.getStartTime().toLocalDate();
+        }
+        collapseFab();
+        overlayPane.set("ADD_SCHEDULE");
+    }
+
+    public void deleteSchedule(com.timeapp.domain.model.CalendarEvent event) {
+        scheduleService.deleteCalendarEvent(event);
+        bumpDataRevision();
         loadEntriesForDay(selectedDay.get());
         refreshCalendarViews();
         closeOverlay();
@@ -368,6 +409,35 @@ public class DashboardController {
      */
     public void saveTodo(com.timeapp.domain.model.ToDoTask task) {
         scheduleService.addToDoTask(task);
+        bumpDataRevision();
+        focusTodoDate(task);
+        loadEntriesForDay(selectedDay.get());
+        closeOverlay();
+    }
+
+    public void updateTodo(com.timeapp.domain.model.ToDoTask target,
+                           com.timeapp.domain.model.ToDoTask replacement) {
+        scheduleService.updateToDoTask(target, replacement);
+        bumpDataRevision();
+        focusTodoDate(target);
+        loadEntriesForDay(selectedDay.get());
+        closeOverlay();
+    }
+
+    public void editTodo(com.timeapp.domain.model.ToDoTask task) {
+        if (task == null) return;
+        editingTodoTask = task;
+        editingScheduleEvent = null;
+        if (task.getScheduledLocalDate() != null) {
+            pendingAddDate = task.getScheduledLocalDate();
+        }
+        collapseFab();
+        overlayPane.set("ADD_TODO");
+    }
+
+    public void deleteTodo(com.timeapp.domain.model.ToDoTask task) {
+        scheduleService.deleteToDoTask(task);
+        bumpDataRevision();
         loadEntriesForDay(selectedDay.get());
         closeOverlay();
     }
@@ -375,9 +445,13 @@ public class DashboardController {
     /** Slides the overlay panel back out (back button or after save). */
     public void closeOverlay() {
         overlayPane.set("NONE");
+        editingScheduleEvent = null;
+        editingTodoTask = null;
     }
 
     public java.time.LocalDate getPendingAddDate() { return pendingAddDate; }
+    public com.timeapp.domain.model.CalendarEvent getEditingScheduleEvent() { return editingScheduleEvent; }
+    public com.timeapp.domain.model.ToDoTask getEditingTodoTask() { return editingTodoTask; }
 
         // -- Calendar navigation ---------------------------------------------------
 
@@ -394,6 +468,7 @@ public class DashboardController {
 
     public void onAddScheduleForDate(java.time.LocalDate date) {
         collapseFab();
+        editingScheduleEvent = null;
         pendingAddDate = date != null ? date : selectedDay.get();
         overlayPane.set("ADD_SCHEDULE");
     }
@@ -471,6 +546,7 @@ public class DashboardController {
         if (!hasAnyValidTimeSlot(record)) return;
         activeTimetable.get().getClasses().add(record);
         persistClassRecord(record, activeTimetable.get());
+        bumpDataRevision();
         loadEntriesForDay(selectedDay.get());
         backToTimetableMain();
     }
@@ -484,6 +560,7 @@ public class DashboardController {
         timetableList.add(timetable);
         setActiveTimetable(timetable);
         persistTimetable(timetable);
+        bumpDataRevision();
         backToTimetableList();
     }
 
@@ -541,6 +618,7 @@ public class DashboardController {
                 timetable.getEndDate()
             );
             rebuildPersistedClasses(timetable);
+            bumpDataRevision();
             loadEntriesForDay(selectedDay.get());
         });
     }
@@ -556,6 +634,7 @@ public class DashboardController {
         if (timetableId != null) {
             scheduleService.deleteTimetable(timetableId);
         }
+        bumpDataRevision();
 
         if (timetable.equals(activeTimetable.get())) {
             activeTimetable.set(timetableList.isEmpty() ? null : timetableList.get(0));
@@ -643,6 +722,7 @@ public class DashboardController {
             }
 
             rebuildPersistedClasses(timetable);
+            bumpDataRevision();
             loadEntriesForDay(selectedDay.get());
         });
     }
@@ -656,6 +736,7 @@ public class DashboardController {
 
         timetable.getClasses().remove(record);
         rebuildPersistedClasses(timetable);
+        bumpDataRevision();
         loadEntriesForDay(selectedDay.get());
     }
 
@@ -708,11 +789,11 @@ public class DashboardController {
                 // Show only on the matching date at the scheduled time
                 java.time.LocalDate taskDate = task.getScheduledLocalDate();
                 if (!date.equals(taskDate)) continue;
-                list.add(new TodoEntry(task.getScheduledLocalTime(), task.getTitle()));
+                list.add(new TodoEntry(task.getScheduledLocalTime(), task.getTitle(), task));
             } else {
                 // Legacy / unscheduled tasks: show on selectedDay at fallback time
                 if (date.equals(selectedDay.get())) {
-                    list.add(new TodoEntry(fallback, task.getTitle()));
+                    list.add(new TodoEntry(fallback, task.getTitle(), task));
                     fallback = fallback.plusMinutes(30);
                 }
             }
@@ -734,7 +815,8 @@ public class DashboardController {
                 event.getStartTime().toLocalTime(),
                 event.getEndTime().toLocalTime(),
                 nullToDefault(event.getTitle(), "Schedule"),
-                nullToEmpty(event.getLocation())
+                nullToEmpty(event.getLocation()),
+                event
             ));
         }
     }
@@ -1078,6 +1160,22 @@ public class DashboardController {
         return value == null || value.isBlank() ? fallback : value;
     }
 
+    private void focusScheduleDate(com.timeapp.domain.model.CalendarEvent event) {
+        if (event == null || event.getStartTime() == null) return;
+        LocalDate date = event.getStartTime().toLocalDate();
+        selectedDay.set(date);
+        weekStart.set(sundayOf(date));
+        selectedCalendarDate.set(date);
+        calendarDisplayMonth.set(YearMonth.from(date));
+    }
+
+    private void focusTodoDate(com.timeapp.domain.model.ToDoTask task) {
+        if (task == null || task.getScheduledLocalDate() == null) return;
+        LocalDate date = task.getScheduledLocalDate();
+        selectedDay.set(date);
+        weekStart.set(sundayOf(date));
+    }
+
     // ?? Helpers ???????????????????????????????????????????????????????????????
 
     public static LocalDate sundayOf(LocalDate date) {
@@ -1094,6 +1192,7 @@ public class DashboardController {
     public ObjectProperty<LocalDate>    selectedDayProperty()        { return selectedDay; }
     public BooleanProperty              sidebarOpenProperty()        { return sidebarOpen; }
     public BooleanProperty              fabExpandedProperty()        { return fabExpanded; }
+    public IntegerProperty              dataRevisionProperty()       { return dataRevision; }
     public ObservableList<TimeEntry>    getDayEntries()              { return dayEntries; }
     public ObservableList<TimeTable>    getTimetableList()           { return timetableList; }
     public ObjectProperty<TimeTable>    activeTimetableProperty()    { return activeTimetable; }
@@ -1104,6 +1203,7 @@ public class DashboardController {
     public LocalDate  getSelectedDay()       { return selectedDay.get(); }
     public boolean    isSidebarOpen()        { return sidebarOpen.get(); }
     public boolean    isFabExpanded()        { return fabExpanded.get(); }
+    public int        getDataRevision()      { return dataRevision.get(); }
     public TimeTable  getActiveTimetable()   { return activeTimetable.get(); }
     public String     getActivePanel()       { return activePanel.get(); }
 
@@ -1141,5 +1241,9 @@ public class DashboardController {
     // Overlay panel accessors
     public javafx.beans.property.StringProperty overlayPaneProperty() { return overlayPane; }
     public String                               getOverlayPane()       { return overlayPane.get(); }
+
+    private void bumpDataRevision() {
+        dataRevision.set(dataRevision.get() + 1);
+    }
 
 }

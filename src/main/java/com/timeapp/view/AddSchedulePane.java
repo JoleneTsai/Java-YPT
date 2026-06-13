@@ -45,6 +45,9 @@ public class AddSchedulePane extends VBox {
 
     private final Label titleError = errorLabel();
     private final Label timeError  = errorLabel();
+    private final Label headerTitle = new Label("Add Schedule");
+    private final Button deleteBtn = new Button("Delete Schedule");
+    private CalendarEvent editingEvent;
 
     public AddSchedulePane(DashboardController ctrl) {
         this.ctrl = ctrl;
@@ -60,7 +63,12 @@ public class AddSchedulePane extends VBox {
         // When this pane becomes active, refresh date to pendingAddDate
         ctrl.overlayPaneProperty().addListener((obs, from, to) -> {
             if ("ADD_SCHEDULE".equals(to)) {
-                resetForm(ctrl.getPendingAddDate());
+                CalendarEvent event = ctrl.getEditingScheduleEvent();
+                if (event != null) {
+                    loadEditForm(event);
+                } else {
+                    resetForm(ctrl.getPendingAddDate());
+                }
             }
         });
     }
@@ -81,11 +89,10 @@ public class AddSchedulePane extends VBox {
         backBtn.setOnAction(e -> ctrl.closeOverlay());
         Tooltip.install(backBtn, new Tooltip("Cancel"));
 
-        Label title = new Label("Add Schedule");
-        title.getStyleClass().add("tt-panel-title");
-        HBox.setHgrow(title, Priority.ALWAYS);
-        title.setAlignment(Pos.CENTER);
-        title.setMaxWidth(Double.MAX_VALUE);
+        headerTitle.getStyleClass().add("tt-panel-title");
+        HBox.setHgrow(headerTitle, Priority.ALWAYS);
+        headerTitle.setAlignment(Pos.CENTER);
+        headerTitle.setMaxWidth(Double.MAX_VALUE);
 
         Label checkIcon = IconLabel.of(IconLabel.CHECK, 16, "tt-save-icon");
         Button saveBtn  = new Button();
@@ -95,7 +102,7 @@ public class AddSchedulePane extends VBox {
         saveBtn.setOnAction(e -> onSave());
         Tooltip.install(saveBtn, new Tooltip("Save"));
 
-        bar.getChildren().addAll(backBtn, title, saveBtn);
+        bar.getChildren().addAll(backBtn, headerTitle, saveBtn);
         return bar;
     }
 
@@ -120,8 +127,19 @@ public class AddSchedulePane extends VBox {
             fieldRow("Location",   locationField),
             sep(),
             textAreaRow("Description", descArea),
-            sep()
+            sep(),
+            deleteBtn
         );
+
+        deleteBtn.getStyleClass().add("tt-add-time-btn");
+        deleteBtn.setMaxWidth(Double.MAX_VALUE);
+        deleteBtn.setVisible(false);
+        deleteBtn.setManaged(false);
+        deleteBtn.setOnAction(e -> {
+            if (editingEvent != null) {
+                ctrl.deleteSchedule(editingEvent);
+            }
+        });
 
         ScrollPane sp = new ScrollPane(form);
         sp.setFitToWidth(true);
@@ -171,18 +189,47 @@ public class AddSchedulePane extends VBox {
             "schedule"
         );
 
-        ctrl.saveSchedule(event);
+        if (editingEvent != null) {
+            ctrl.updateSchedule(editingEvent, event);
+        } else {
+            ctrl.saveSchedule(event);
+        }
     }
 
     // ── Reset ─────────────────────────────────────────────────────────────────
 
     public void resetForm(LocalDate defaultDate) {
+        editingEvent = null;
+        headerTitle.setText("Add Schedule");
         titleField.clear();
         datePicker.setValue(defaultDate != null ? defaultDate : LocalDate.now());
         startBox.setValue(LocalTime.of(9, 0));
         endBox.setValue(LocalTime.of(10, 0));
         locationField.clear();
         descArea.clear();
+        deleteBtn.setVisible(false);
+        deleteBtn.setManaged(false);
+        hide(titleError); hide(timeError);
+        titleField.getStyleClass().remove("tt-field-error");
+    }
+
+    private void loadEditForm(CalendarEvent event) {
+        editingEvent = event;
+        headerTitle.setText("Edit Schedule");
+        titleField.setText(event.getTitle() != null ? event.getTitle() : "");
+        datePicker.setValue(event.getStartTime() != null
+            ? event.getStartTime().toLocalDate()
+            : LocalDate.now());
+        startBox.setValue(event.getStartTime() != null
+            ? event.getStartTime().toLocalTime()
+            : LocalTime.of(9, 0));
+        endBox.setValue(event.getEndTime() != null
+            ? event.getEndTime().toLocalTime()
+            : LocalTime.of(10, 0));
+        locationField.setText(event.getLocation() != null ? event.getLocation() : "");
+        descArea.setText(event.getDescription() != null ? event.getDescription() : "");
+        deleteBtn.setVisible(true);
+        deleteBtn.setManaged(true);
         hide(titleError); hide(timeError);
         titleField.getStyleClass().remove("tt-field-error");
     }

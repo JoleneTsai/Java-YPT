@@ -168,7 +168,7 @@ public class DashboardView {
         topSection.getChildren().addAll(buildTopBar(), buildWeekStrip());
         page.setTop(topSection);
 
-        TimelinePane timeline = new TimelinePane(390, ctrl.getDayEntries());
+        TimelinePane timeline = new TimelinePane(390, ctrl.getDayEntries(), ctrl);
         page.setCenter(timeline.getNode());
         return page;
     }
