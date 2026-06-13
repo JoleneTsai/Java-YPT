@@ -1,13 +1,13 @@
-# Java-YPT Study Planner
+# TimeFlow Study Planner
 
-Java-YPT is a JavaFX study planning app for managing daily schedules, to-do tasks, calendars, and course timetables. The app uses a mobile-style dashboard layout and stores user data locally through a JSON-based persistence layer.
+TimeFlow is a JavaFX study planning app for managing daily schedules, to-do tasks, calendars, and course timetables. The app uses a mobile-style dashboard layout and stores user data locally through a JSON-based persistence layer.
 
 ---
 
 ## Project Structure
 
 ```text
-Java-YPT/
+TimeFlow/
 |-- pom.xml                                      Maven build file
 |-- README.md
 `-- src/main/
