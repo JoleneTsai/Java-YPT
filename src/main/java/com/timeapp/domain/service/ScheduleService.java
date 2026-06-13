@@ -76,6 +76,25 @@ public class ScheduleService {
         saveData();
     }
 
+    public void updateCalendarEvent(CalendarEvent target, CalendarEvent replacement) {
+        Objects.requireNonNull(target, "target must not be null");
+        Objects.requireNonNull(replacement, "replacement must not be null");
+        target.setTitle(replacement.getTitle());
+        target.setStartTime(replacement.getStartTime());
+        target.setEndTime(replacement.getEndTime());
+        target.setLocation(replacement.getLocation());
+        target.setDescription(replacement.getDescription());
+        target.setColor(replacement.getColor());
+        target.setTag(replacement.getTag());
+        saveData();
+    }
+
+    public void deleteCalendarEvent(CalendarEvent event) {
+        if (event != null && data.getCalendarEvents().remove(event)) {
+            saveData();
+        }
+    }
+
     // ── Timetable entries ─────────────────────────────────────────────────────
 
     public void addTimetableEntry(TimetableEntry entry) {
@@ -138,6 +157,16 @@ public class ScheduleService {
         saveData();
     }
 
+    public void updateToDoTask(ToDoTask target, ToDoTask replacement) {
+        Objects.requireNonNull(target, "target must not be null");
+        Objects.requireNonNull(replacement, "replacement must not be null");
+        target.setTitle(replacement.getTitle());
+        target.setCompleted(replacement.isCompleted());
+        target.setScheduledDate(replacement.getScheduledDate());
+        target.setScheduledTime(replacement.getScheduledTime());
+        saveData();
+    }
+
     public void updateToDoStatus(int index, boolean completed) {
         data.getTodoTasks().get(index).setCompleted(completed);
         saveData();
@@ -146,6 +175,12 @@ public class ScheduleService {
     public void deleteToDoTask(int index) {
         data.getTodoTasks().remove(index);
         saveData();
+    }
+
+    public void deleteToDoTask(ToDoTask task) {
+        if (task != null && data.getTodoTasks().remove(task)) {
+            saveData();
+        }
     }
 
     public List<ToDoTask> getToDoTasks() {

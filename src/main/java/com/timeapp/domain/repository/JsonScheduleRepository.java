@@ -103,9 +103,15 @@ public class JsonScheduleRepository implements ScheduleRepository {
                 getString(object, "title"),
                 getBoolean(object, "completed")
             );
-            // v10: read optional scheduled date/time (backward compatible -- null if absent)
-            String sd = getString(object, "scheduledDate");
-            String st = getString(object, "scheduledTime");
+            // Read both the v10 field names and the version-12 names.
+            String sd = firstNonBlank(
+                getString(object, "scheduledDate"),
+                getString(object, "date")
+            );
+            String st = firstNonBlank(
+                getString(object, "scheduledTime"),
+                getString(object, "startTime")
+            );
             if (sd != null && !sd.isBlank()) task.setScheduledDate(sd);
             if (st != null && !st.isBlank()) task.setScheduledTime(st);
             tasks.add(task);
@@ -380,6 +386,13 @@ public class JsonScheduleRepository implements ScheduleRepository {
             throw new IllegalStateException(key + " must be a string.");
         }
         return (String) value;
+    }
+
+    private String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        return (second != null && !second.isBlank()) ? second : null;
     }
 
     private boolean getBoolean(Map<String, Object> object, String key) {

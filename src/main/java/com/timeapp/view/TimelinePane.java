@@ -1,5 +1,6 @@
 package com.timeapp.view;
 
+import com.timeapp.controller.DashboardController;
 import com.timeapp.ui.model.*;
 import javafx.collections.*;
 import javafx.geometry.Insets;
@@ -9,7 +10,11 @@ import javafx.scene.shape.*;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Scrollable vertical timeline showing hour markers and event cards.
@@ -38,6 +43,10 @@ public class TimelinePane {
     public static final double ROW_H   = 64;
     public static final double GUTTER  = 56;
     public static final double PADDING = 8;
+    private static final double CARD_GAP = 6;
+    private static final double TODO_WIDTH = 150;
+    private static final double TODO_HEIGHT = 30;
+    private static final double TODO_STACK_OFFSET = 34;
     private static final int   START_H = 7;
     private static final int   END_H   = 23;
 
@@ -47,9 +56,18 @@ public class TimelinePane {
     private final ScrollPane scrollPane;
     private final AnchorPane canvas;
     private final double     totalWidth;
+    private final DashboardController ctrl;
+    private final List<javafx.scene.Node> todoNodes = new ArrayList<>();
+    private javafx.scene.Node elevatedEventNode;
 
     public TimelinePane(double totalWidth, ObservableList<TimeEntry> entries) {
+        this(totalWidth, entries, null);
+    }
+
+    public TimelinePane(double totalWidth, ObservableList<TimeEntry> entries,
+                        DashboardController ctrl) {
         this.totalWidth = totalWidth;
+        this.ctrl = ctrl;
 
         canvas = new AnchorPane();
         canvas.getStyleClass().add("timeline-canvas");
@@ -105,20 +123,47 @@ public class TimelinePane {
     // ── Entry rendering ───────────────────────────────────────────────────────
 
     private void renderEntries(List<TimeEntry> entries) {
+        todoNodes.clear();
+        elevatedEventNode = null;
+
+        List<TimeEntry> events = new ArrayList<>();
+        List<TimeEntry> todos = new ArrayList<>();
+
+        for (TimeEntry entry : entries) {
+            if (entry.getType() == TimeEntry.Type.TODO) {
+                todos.add(entry);
+            } else {
+                events.add(entry);
+            }
+        }
+
+        renderEventEntries(events);
+        renderTodoEntries(todos);
+    }
+
+    private void renderEventEntries(List<TimeEntry> entries) {
+        Map<TimeEntry, Placement> placements = computeOverlapPlacements(entries);
+
         for (TimeEntry entry : entries) {
             javafx.scene.Node node = switch (entry.getType()) {
-                case TODO            -> buildTodoNode((TodoEntry) entry);
                 case CALENDAR_EVENT  -> buildCalendarCard((CalendarEvent) entry);
                 case TIMETABLE_CLASS -> buildTimetableCard((TimetableClass) entry);
+                default -> throw new IllegalStateException("Unexpected event type: " + entry.getType());
             };
 
+            Placement placement = placements.getOrDefault(entry, new Placement(0, 1));
             double y = timeToY(entry.getStartTime());
             double h = Math.max(minutesToPx(entry.getDurationMinutes()), 44);
-            double x = GUTTER + 4;
-            double w = totalWidth - x - 8;
+            double baseX = GUTTER + 4;
+            double availableWidth = totalWidth - baseX - 8;
+            double columnWidth = (availableWidth - CARD_GAP * (placement.columnCount - 1))
+                    / placement.columnCount;
+            double x = baseX + placement.column * (columnWidth + CARD_GAP);
+            double w = Math.max(columnWidth, 44);
 
             AnchorPane.setLeftAnchor(node, x);
             AnchorPane.setTopAnchor(node, y);
+            installCardInteractions(node, entry);
             if (node instanceof Region r) {
                 r.setPrefWidth(w);
                 r.setPrefHeight(h);
@@ -126,6 +171,166 @@ public class TimelinePane {
             }
             canvas.getChildren().add(node);
         }
+    }
+
+    private void renderTodoEntries(List<TimeEntry> todos) {
+        todos.sort(Comparator
+            .comparing(TimeEntry::getStartTime)
+            .thenComparing(TimeEntry::getTitle, Comparator.nullsLast(String::compareTo)));
+
+        Map<LocalTime, Integer> stackedAtTime = new java.util.HashMap<>();
+        for (TimeEntry entry : todos) {
+            javafx.scene.Node node = buildTodoNode((TodoEntry) entry);
+            double y = timeToY(entry.getStartTime());
+            int stackIndex = stackedAtTime.getOrDefault(entry.getStartTime(), 0);
+            stackedAtTime.put(entry.getStartTime(), stackIndex + 1);
+
+            double w = Math.min(TODO_WIDTH, totalWidth - GUTTER - 16);
+            double x = totalWidth - w - 18;
+
+            AnchorPane.setLeftAnchor(node, x);
+            AnchorPane.setTopAnchor(node, y + stackIndex * TODO_STACK_OFFSET);
+            installCardInteractions(node, entry);
+            if (node instanceof Region r) {
+                r.setPrefWidth(w);
+                r.setPrefHeight(TODO_HEIGHT);
+                r.setMaxHeight(TODO_HEIGHT);
+            }
+            canvas.getChildren().add(node);
+            todoNodes.add(node);
+        }
+    }
+
+    private Map<TimeEntry, Placement> computeOverlapPlacements(List<TimeEntry> entries) {
+        List<TimeEntry> sorted = new ArrayList<>(entries);
+        sorted.sort(Comparator
+            .comparing(TimeEntry::getStartTime)
+            .thenComparing(TimeEntry::getEndTime));
+
+        Map<TimeEntry, Placement> placements = new IdentityHashMap<>();
+        List<TimeEntry> group = new ArrayList<>();
+        LocalTime groupEnd = null;
+
+        for (TimeEntry entry : sorted) {
+            if (group.isEmpty()) {
+                group.add(entry);
+                groupEnd = entry.getEndTime();
+                continue;
+            }
+
+            if (entry.getStartTime().isBefore(groupEnd)) {
+                group.add(entry);
+                if (entry.getEndTime().isAfter(groupEnd)) {
+                    groupEnd = entry.getEndTime();
+                }
+            } else {
+                assignGroupPlacements(group, placements);
+                group.clear();
+                group.add(entry);
+                groupEnd = entry.getEndTime();
+            }
+        }
+
+        if (!group.isEmpty()) {
+            assignGroupPlacements(group, placements);
+        }
+        return placements;
+    }
+
+    private void assignGroupPlacements(List<TimeEntry> group,
+                                       Map<TimeEntry, Placement> placements) {
+        List<LocalTime> columnEnds = new ArrayList<>();
+        Map<TimeEntry, Integer> assignedColumns = new IdentityHashMap<>();
+
+        for (TimeEntry entry : group) {
+            int column = firstAvailableColumn(entry, columnEnds);
+            if (column == columnEnds.size()) {
+                columnEnds.add(entry.getEndTime());
+            } else {
+                columnEnds.set(column, entry.getEndTime());
+            }
+            assignedColumns.put(entry, column);
+        }
+
+        int columnCount = Math.max(columnEnds.size(), 1);
+        for (Map.Entry<TimeEntry, Integer> assignment : assignedColumns.entrySet()) {
+            placements.put(assignment.getKey(),
+                new Placement(assignment.getValue(), columnCount));
+        }
+    }
+
+    private int firstAvailableColumn(TimeEntry entry, List<LocalTime> columnEnds) {
+        for (int i = 0; i < columnEnds.size(); i++) {
+            if (!entry.getStartTime().isBefore(columnEnds.get(i))) {
+                return i;
+            }
+        }
+        return columnEnds.size();
+    }
+
+    private static final class Placement {
+        final int column;
+        final int columnCount;
+
+        Placement(int column, int columnCount) {
+            this.column = column;
+            this.columnCount = columnCount;
+        }
+    }
+
+    private void installCardInteractions(javafx.scene.Node node, TimeEntry entry) {
+        node.setOnMouseClicked(e -> {
+            if (entry.getType() == TimeEntry.Type.TODO) {
+                node.toFront();
+                elevatedEventNode = null;
+            } else if (elevatedEventNode == node) {
+                bringTodosToFront();
+                elevatedEventNode = null;
+            } else {
+                node.toFront();
+                elevatedEventNode = node;
+            }
+        });
+
+        ContextMenu menu = contextMenuFor(entry);
+        if (menu != null) {
+            node.setOnContextMenuRequested(e -> {
+                node.toFront();
+                elevatedEventNode = entry.getType() == TimeEntry.Type.TODO ? null : node;
+                menu.show(node, e.getScreenX(), e.getScreenY());
+                e.consume();
+            });
+        }
+    }
+
+    private void bringTodosToFront() {
+        for (javafx.scene.Node todoNode : todoNodes) {
+            todoNode.toFront();
+        }
+    }
+
+    private ContextMenu contextMenuFor(TimeEntry entry) {
+        if (ctrl == null) {
+            return null;
+        }
+
+        if (entry instanceof TodoEntry todo && todo.getSourceTask() != null) {
+            MenuItem edit = new MenuItem("Edit To-Do");
+            edit.setOnAction(e -> ctrl.editTodo(todo.getSourceTask()));
+            MenuItem delete = new MenuItem("Delete To-Do");
+            delete.setOnAction(e -> ctrl.deleteTodo(todo.getSourceTask()));
+            return new ContextMenu(edit, delete);
+        }
+
+        if (entry instanceof CalendarEvent event && event.getSourceEvent() != null) {
+            MenuItem edit = new MenuItem("Edit Schedule");
+            edit.setOnAction(e -> ctrl.editSchedule(event.getSourceEvent()));
+            MenuItem delete = new MenuItem("Delete Schedule");
+            delete.setOnAction(e -> ctrl.deleteSchedule(event.getSourceEvent()));
+            return new ContextMenu(edit, delete);
+        }
+
+        return null;
     }
 
     // ── Todo node ─────────────────────────────────────────────────────────────
@@ -145,13 +350,8 @@ public class TimelinePane {
         todo.completedProperty().addListener((obs, o, n) ->
             title.setStyle(n ? "-fx-strikethrough: true; -fx-opacity: 0.45;" : ""));
 
-        Label timeLabel = new Label(todo.getStartTime().format(T_FMT));
-        timeLabel.getStyleClass().add("todo-time");
-
-        Region spacer = new Region();
-        HBox.setHgrow(spacer, Priority.ALWAYS);
-
-        box.getChildren().addAll(cb, title, spacer, timeLabel);
+        HBox.setHgrow(title, Priority.ALWAYS);
+        box.getChildren().addAll(cb, title);
         return box;
     }
 

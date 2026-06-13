@@ -215,23 +215,20 @@
 
 /* ── To-do Row ────────────────────────────────────────────────────────────── */
 .todo-row {
-    -fx-background-color: #FFFFFF;
-    -fx-background-radius: 12;
-    -fx-padding: 12 16 12 16;
-    -fx-border-color: #E5E5EA;
-    -fx-border-radius: 12;
-    -fx-border-width: 1;
+    -fx-background-color: transparent;
+    -fx-padding: 2 4 2 4;
+    -fx-spacing: 6;
     -fx-cursor: hand;
-    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.02), 4, 0, 0, 2);
+    -fx-alignment: center-left;
 }
 
 .todo-row:hover {
-    -fx-background-color: #FAFAFA;
-    -fx-border-color: #C7C7CC;
+    -fx-background-color: rgba(255,255,255,0.72);
+    -fx-background-radius: 7;
 }
 
 .todo-title {
-    -fx-font-size: 14px;
+    -fx-font-size: 13px;
     -fx-text-fill: #111111;
     -fx-font-weight: normal;
 }
@@ -243,21 +240,23 @@
 
 .todo-checkbox .box {
     -fx-background-color: #FFFFFF;
-    -fx-border-color: #dd564f;
-    -fx-border-radius: 6;
-    -fx-background-radius: 6;
-    -fx-border-width: 1.5;
-    -fx-min-width: 20px;
-    -fx-min-height: 20px;
+    -fx-border-color: #C7C7CC;
+    -fx-border-radius: 4;
+    -fx-background-radius: 4;
+    -fx-border-width: 1.2;
+    -fx-min-width: 15px;
+    -fx-min-height: 15px;
+    -fx-max-width: 15px;
+    -fx-max-height: 15px;
 }
 
 .todo-checkbox:selected .box {
-    -fx-background-color: #dd564f;
-    -fx-border-color: #dd564f;
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #8E8E93;
 }
 
 .todo-checkbox:selected .mark {
-    -fx-background-color: white;
+    -fx-background-color: #111111;
 }
 
 /* ── Event Cards ──────────────────────────────────────────────────────────── */
@@ -955,4 +954,195 @@
 .card-icon {
     -fx-text-fill: #8E8E93;
     -fx-font-size: 10px;
+}
+
+
+/* ════════════════════════════════════════════════════════════════════════════
+   DATEPICKER POPUP — styled to match the app's minimalist white design system.
+   Locale is forced to English in MainApp.main() so month names are in English.
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* The text field part of the DatePicker control (inline, not popup) */
+.tt-date-picker .text-field {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-font-size: 14px;
+    -fx-text-fill: #333333;
+    -fx-padding: 0;
+}
+
+.tt-date-picker .arrow-button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-cursor: hand;
+    -fx-padding: 0 4 0 4;
+}
+
+.tt-date-picker .arrow-button .arrow {
+    -fx-background-color: #8E8E93;
+}
+
+/* ── Popup container ─────────────────────────────────────────────────────── */
+
+.date-picker-popup {
+    -fx-background-color: #FFFFFF;
+    -fx-border-color: #E5E5EA;
+    -fx-border-radius: 12;
+    -fx-background-radius: 12;
+    -fx-effect: dropshadow(three-pass-box, rgba(0,0,0,0.14), 20, 0, 0, 6);
+    -fx-padding: 0;
+}
+
+.date-picker-popup > * {
+    -fx-background-color: #FFFFFF;
+    -fx-background-radius: 12;
+}
+
+/* ── Month / year navigation bar ─────────────────────────────────────────── */
+
+.date-picker-popup .month-year-pane {
+    -fx-background-color: #FAFAFA;
+    -fx-padding: 10 8 10 8;
+    -fx-border-color: transparent transparent #E5E5EA transparent;
+    -fx-border-width: 0 0 1 0;
+    -fx-background-radius: 12 12 0 0;
+}
+
+.date-picker-popup .spinner {
+    -fx-background-color: transparent;
+}
+
+.date-picker-popup .spinner .label {
+    -fx-font-size: 14px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #111111;
+    -fx-alignment: center;
+}
+
+.date-picker-popup .spinner > .button {
+    -fx-background-color: transparent;
+    -fx-border-color: transparent;
+    -fx-cursor: hand;
+    -fx-padding: 6 10 6 10;
+    -fx-background-radius: 8;
+}
+
+.date-picker-popup .spinner > .button:hover {
+    -fx-background-color: #F2F2F7;
+    -fx-background-radius: 8;
+}
+
+.date-picker-popup .spinner > .button > .left-arrow,
+.date-picker-popup .spinner > .button > .right-arrow {
+    -fx-background-color: #555555;
+}
+
+/* ── Calendar grid ───────────────────────────────────────────────────────── */
+
+.date-picker-popup .calendar-grid {
+    -fx-background-color: #FFFFFF;
+    -fx-padding: 6 8 8 8;
+    -fx-hgap: 2;
+    -fx-vgap: 2;
+}
+
+/* Day-name header row (Sun Mon Tue ...) */
+.date-picker-popup .day-name-cell {
+    -fx-font-size: 11px;
+    -fx-font-weight: bold;
+    -fx-text-fill: #8E8E93;
+    -fx-alignment: center;
+    -fx-pref-width: 34px;
+    -fx-pref-height: 28px;
+}
+
+/* Individual day cells */
+.date-picker-popup .day-cell {
+    -fx-font-size: 13px;
+    -fx-text-fill: #222222;
+    -fx-background-color: transparent;
+    -fx-alignment: center;
+    -fx-pref-width: 34px;
+    -fx-pref-height: 34px;
+    -fx-cursor: hand;
+    -fx-background-radius: 50%;
+}
+
+.date-picker-popup .day-cell:hover {
+    -fx-background-color: #F2F2F7;
+    -fx-background-radius: 50%;
+}
+
+.date-picker-popup .day-cell:focused {
+    -fx-background-color: #F2F2F7;
+    -fx-background-radius: 50%;
+}
+
+/*
+ * Today: same red as .day-circle-today in WeekStripBar (#ee5e56).
+ * Keeps the "today" visual consistent across WeekStrip, Calendar grid,
+ * and DatePicker popup.
+ */
+.date-picker-popup .day-cell.today {
+    -fx-background-color: #ee5e56;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-weight: bold;
+    -fx-background-radius: 50%;
+}
+
+.date-picker-popup .day-cell.today:hover {
+    -fx-background-color: #d94f48;
+    -fx-background-radius: 50%;
+}
+
+/* Selected date: accent blue */
+.date-picker-popup .day-cell.selected {
+    -fx-background-color: #007AFF;
+    -fx-text-fill: #FFFFFF;
+    -fx-font-weight: bold;
+    -fx-background-radius: 50%;
+}
+
+.date-picker-popup .day-cell.selected:hover {
+    -fx-background-color: #0056CC;
+    -fx-background-radius: 50%;
+}
+
+/* Overflow days (from adjacent months) */
+.date-picker-popup .day-cell.previous-month,
+.date-picker-popup .day-cell.next-month {
+    -fx-opacity: 0.38;
+}
+
+/* Week number column (hidden by default; style if enabled) */
+.date-picker-popup .week-number-cell {
+    -fx-font-size: 10px;
+    -fx-text-fill: #C7C7CC;
+    -fx-alignment: center;
+}
+
+/* ── TextArea in Add Schedule form ───────────────────────────────────────── */
+
+.tt-text-area {
+    -fx-background-color: #F2F2F7;
+    -fx-background-radius: 8;
+    -fx-border-color: transparent;
+    -fx-font-size: 14px;
+    -fx-text-fill: #333333;
+    -fx-prompt-text-fill: #C7C7CC;
+    -fx-padding: 8 10 8 10;
+    -fx-wrap-text: true;
+}
+
+.tt-text-area:focused {
+    -fx-background-color: #EAEAF2;
+    -fx-border-color: transparent;
+}
+
+.tt-text-area .scroll-pane {
+    -fx-background-color: transparent;
+}
+
+.tt-text-area .scroll-pane .viewport {
+    -fx-background-color: transparent;
 }

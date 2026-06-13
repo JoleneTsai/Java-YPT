@@ -3,6 +3,7 @@ package com.timeapp.view.timetable;
 import com.timeapp.controller.DashboardController;
 import com.timeapp.ui.model.TimeTable;
 import com.timeapp.view.IconLabel;
+import javafx.beans.binding.Bindings;
 import javafx.collections.ListChangeListener;
 import javafx.geometry.*;
 import javafx.scene.control.*;
@@ -38,6 +39,7 @@ public class TimetableListPane extends VBox {
 
         ctrl.getTimetableList().addListener((ListChangeListener<TimeTable>) c -> buildList());
         ctrl.activeTimetableProperty().addListener((obs, o, n) -> buildList());
+        ctrl.dataRevisionProperty().addListener((obs, o, n) -> buildList());
 
         buildList();
     }
@@ -143,9 +145,15 @@ public class TimetableListPane extends VBox {
 
         Label nameLbl = new Label(tt.getTitle());
         nameLbl.getStyleClass().add(isActive ? "tt-list-name-active" : "tt-list-name");
+        nameLbl.textProperty().bind(tt.titleProperty());
 
         Label dateLbl = new Label(tt.getDateRangeDisplay());
         dateLbl.getStyleClass().add("tt-list-dates");
+        dateLbl.textProperty().bind(Bindings.createStringBinding(
+            tt::getDateRangeDisplay,
+            tt.startDateProperty(),
+            tt.endDateProperty()
+        ));
 
         VBox textBox = new VBox(3, nameLbl, dateLbl);
         HBox.setHgrow(textBox, Priority.ALWAYS);
